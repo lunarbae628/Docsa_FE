@@ -8,7 +8,7 @@
     "build": "vite build",
     "format": "yarn biome format --write",
     "preview": "vite preview",
-    "codegen": "openapi-generator-cli generate -i https://docsa.kro.kr/v3/api-docs -g typescript-fetch -o src/api/__generated__"
+    "codegen": "openapi-generator-cli generate -i https://api.docsa.o-r.kr/v3/api-docs -g typescript-fetch -o src/api/__generated__"
   },
   "dependencies": {
     "@editorjs/code": "^2.9.3",

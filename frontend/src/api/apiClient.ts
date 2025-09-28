@@ -8,7 +8,7 @@ import {
   SaveAPIApi,
 } from "./__generated__"
 
-export const BACKEND_API = import.meta.env.DEV ? "" : "https://docsa.kro.kr"
+export const BACKEND_API = import.meta.env.DEV ? "http://localhost:8080" : "https://api.docsa.o-r.kr"
 
 const customFetch = async (url: string, init?: RequestInit) => {
   // 새로운 init 객체 생성

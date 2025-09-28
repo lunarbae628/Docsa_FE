@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://docsa.kro.kr",
+        target: "https://api.docsa.o-r.kr",
         changeOrigin: true,
         secure: true,
         configure: (proxy, options) => {
@@ -30,7 +30,7 @@ export default defineConfig({
             proxyReq.removeHeader('sec-ch-ua-platform');
             
             // Origin 헤더를 서버 주소로 변경
-            proxyReq.setHeader('origin', 'https://docsa.kro.kr');
+            proxyReq.setHeader('origin', 'https://api.docsa.o-r.kr');
             proxyReq.removeHeader('referer');
           });
           proxy.on('proxyRes', (proxyRes, req, res) => {

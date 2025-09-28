@@ -13,7 +13,7 @@
  */
 
 
-export const BASE_PATH = "https://docsa.kro.kr".replace(/\/+$/, "");
+export const BASE_PATH = "https://api.docsa.o-r.kr".replace(/\/+$/, "");
 
 export interface ConfigurationParameters {
     basePath?: string; // override base path

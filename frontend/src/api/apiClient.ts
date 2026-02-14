@@ -8,7 +8,7 @@ import {
   SaveAPIApi,
 } from "./__generated__"
 
-export const BACKEND_API = import.meta.env.BACKEND_API;
+export const BACKEND_API = import.meta.env.VITE_BACKEND_API;
 
 const customFetch = async (url: string, init?: RequestInit) => {
   // 새로운 init 객체 생성

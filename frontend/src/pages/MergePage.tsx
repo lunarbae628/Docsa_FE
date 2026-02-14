@@ -60,26 +60,11 @@ export default function MergePage() {
       navigate(`/documents/${documentId}`)
       window.location.reload()
     },
-    onError: async (error: any) => {
+    onError:  (error: any) => {
       console.error("Merge failed:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "병합 중 오류가 발생했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
-
-      console.log("errorMessage", errorMessage)
+      const errorMessage = error.message || "병합 중 오류가 발생했습니다.";
 
       // 에러 처리 (추후 toast 등으로 개선 가능)
       alertDialog(errorMessage, "병합 오류", "destructive")

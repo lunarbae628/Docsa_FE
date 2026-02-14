@@ -45,24 +45,11 @@ export function useEditDocument({ documents }: UseEditDocumentProps) {
 
       console.log("문서 제목 수정 완료:", response)
     },
-    onError: async (error: any) => {
+    onError:  (error: any) => {
       console.error("제목 수정 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "제목 수정에 실패했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
+      const errorMessage = error.message || "제목 수정에 실패했습니다."
 
       console.log("errorMessage", errorMessage)
 

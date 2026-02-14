@@ -189,20 +189,7 @@ export default function DocumentDetailPage() {
       console.error("버전 생성 중 오류:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "버전 생성 중 오류가 발생했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
+      const errorMessage = error.message || "버전 생성 중 오류가 발생했습니다."
 
       console.log("errorMessage", errorMessage)
 
@@ -225,26 +212,11 @@ export default function DocumentDetailPage() {
       // 삭제 성공 시 페이지 리로드
       window.location.reload()
     },
-    onError: async (error: any) => {
+    onError:  (error: any) => {
       console.error("버전 삭제 중 오류:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "버전 삭제 중 오류가 발생했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
-
-      console.log("errorMessage", errorMessage)
+      const errorMessage = error.message || "버전 삭제 중 오류가 발생했습니다."
 
       alertDialog(errorMessage, "오류", "destructive")
     },
@@ -269,22 +241,7 @@ export default function DocumentDetailPage() {
       console.error("커밋 삭제 중 오류:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "커밋 삭제 중 오류가 발생했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
-
-      console.log("errorMessage", errorMessage)
+      const errorMessage = error.message || "커밋 삭제 중 오류가 발생했습니다."
 
       alertDialog(errorMessage, "오류", "destructive")
     },

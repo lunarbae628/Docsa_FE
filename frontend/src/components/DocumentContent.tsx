@@ -120,20 +120,7 @@ export default function DocumentContent({
       console.error("저장 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "저장에 실패했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
+      const errorMessage = error.message || "저장에 실패했습니다."
 
       console.log("errorMessage", errorMessage)
 
@@ -174,20 +161,7 @@ export default function DocumentContent({
       console.error("기록 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "기록에 실패했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
+      const  errorMessage =  error.message || "기록에 실패했습니다."
 
       console.log("errorMessage", errorMessage)
 

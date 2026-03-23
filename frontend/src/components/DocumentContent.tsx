@@ -9,7 +9,7 @@ import { Button } from "./ui/button"
 import { apiClient } from "@/api/apiClient"
 import { useRef, useState, useMemo, useCallback } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { calculateBlockDiff } from "@/lib/diffUtils"
+import { calculateBlockDiffById } from "@/lib/diffUtils"
 
 import { useDialog, alertDialog } from "./ui/alert-dialog"
 import { useNavigate } from "react-router"
@@ -225,7 +225,7 @@ export default function DocumentContent({
     } else {
       // 원본 데이터와 현재 데이터를 비교하여 변경된 블록만 추출
       const prevCommitDiffEditorData = convertToEditorData(commitDiffData)
-      const blockDiffs = calculateBlockDiff(
+      const blockDiffs = calculateBlockDiffById(
         prevCommitDiffEditorData,
         currentData,
       )

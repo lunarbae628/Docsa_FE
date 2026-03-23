@@ -129,6 +129,86 @@ export function calculateBlockDiff(
   return results
 }
 
+function hasUniqueStableIds(blocks: EditorBlock[]): boolean {
+  const ids = new Set<string>()
+
+  for (const block of blocks) {
+    if (!block?.id) return false
+    if (ids.has(block.id)) return false
+    ids.add(block.id)
+  }
+
+  return true
+}
+
+export function calculateBlockDiffById(
+  oldData: OutputData,
+  newData: OutputData,
+): BlockDiff[] {
+  const oldBlocks = (oldData?.blocks as EditorBlock[]) || []
+  const newBlocks = (newData?.blocks as EditorBlock[]) || []
+
+  if (!hasUniqueStableIds(oldBlocks) || !hasUniqueStableIds(newBlocks)) {
+    return calculateBlockDiff(oldData, newData)
+  }
+
+  const dmp = new diff_match_patch()
+  const results: BlockDiff[] = []
+  const oldBlocksById = new Map(oldBlocks.map((block) => [block.id, block]))
+  const seenOldBlockIds = new Set<string>()
+
+  for (let i = 0; i < newBlocks.length; i++) {
+    const newBlock = newBlocks[i]
+    const oldBlock = oldBlocksById.get(newBlock.id)
+
+    if (!oldBlock) {
+      results.push({
+        type: "added",
+        block: newBlock,
+        index: i,
+      })
+      continue
+    }
+
+    seenOldBlockIds.add(newBlock.id)
+
+    const oldText = blockToText(oldBlock)
+    const newText = blockToText(newBlock)
+
+    if (oldText !== newText || oldBlock.type !== newBlock.type) {
+      const diffs = dmp.diff_main(oldText, newText)
+      dmp.diff_cleanupSemantic(diffs)
+      results.push({
+        type: "modified",
+        oldBlock,
+        newBlock,
+        diffs: diffs as [number, string][],
+        index: i,
+      })
+    } else {
+      results.push({
+        type: "unchanged",
+        block: newBlock,
+        index: i,
+      })
+    }
+  }
+
+  for (let i = 0; i < oldBlocks.length; i++) {
+    const oldBlock = oldBlocks[i]
+
+    if (!seenOldBlockIds.has(oldBlock.id)) {
+      results.push({
+        type: "deleted",
+        block: oldBlock,
+        index: i,
+      })
+    }
+  }
+
+  return results
+}
+
 // 전체 문서 diff 계산
 export function calculateDocumentDiff(
   oldData: OutputData,

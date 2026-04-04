@@ -15,10 +15,13 @@ export default function HomePage() {
     }
   }
 
+  const handleOpenDemo = () => {
+    navigate("/demo/working-save-flow")
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 items-center min-h-[calc(100vh-5rem)]">
-        {/* Left Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 items-center min-h-[calc(100vh-5rem)] gap-12">
         <div className="space-y-8">
           <div className="space-y-6">
             <div className="w-[200px]">
@@ -34,7 +37,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="pt-4">
+          <div className="pt-4 flex flex-wrap gap-4">
             <Button
               onClick={handleGetStarted}
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-8 text-lg rounded-lg font-medium transition-colors"
@@ -42,10 +45,17 @@ export default function HomePage() {
             >
               Let's Get Started
             </Button>
+            <Button
+              onClick={handleOpenDemo}
+              variant="outline"
+              className="px-8 py-8 text-lg rounded-lg font-medium"
+              size="lg"
+            >
+              작업장 데모 보기
+            </Button>
           </div>
         </div>
 
-        {/* Right Content - Snake Image */}
         <div className="flex justify-center lg:justify-end">
           <div className="relative w-full">
             <img

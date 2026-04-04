@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React from "react"
 import { Handle, Position } from "reactflow"
 import {
   DropdownMenu,
@@ -32,15 +32,12 @@ const TempNode = React.memo(function TempNode({
   branchName,
   color,
   isCurrentTemp,
-  title,
-  description,
   onNodeMenuClick,
   openDropdownId,
   setOpenDropdownId,
 }: TempNodeProps) {
   return (
     <>
-      {/* React Flow Handles for connections */}
       <Handle
         type="target"
         position={Position.Top}
@@ -86,13 +83,13 @@ const TempNode = React.memo(function TempNode({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-xs text-gray-600 mt-1 truncate invisible">
-              {description}
+              working copy
             </div>
             <div className="font-semibold text-sm truncate text-gray-700">
-              저장
+              작업장
             </div>
             <div className="text-xs text-gray-500 mt-2 italic invisible">
-              저장됨
+              활성화됨
             </div>
             <div
               className="text-xs mt-2 px-2 py-1 rounded-full inline-block text-white opacity-80"
@@ -112,7 +109,7 @@ const TempNode = React.memo(function TempNode({
             className="cursor-pointer"
           >
             <Play className="h-4 w-4 mr-2" />
-            작업하기
+            작업장 열기
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

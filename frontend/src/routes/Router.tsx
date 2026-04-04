@@ -1,18 +1,22 @@
-import { BrowserRouter, Routes, Route } from "react-router"
-import HomePage from "../pages/HomePage"
-import PageLayout from "../layouts/PageLayout"
-import SignupPage from "@/pages/SignupPage"
-import LoginPage from "@/pages/LoginPage"
-import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
-import DocumentsPage from "@/pages/DocumentsPage"
-import DocumentDetailPage from "@/pages/DocumentDetailPage"
-import MergePage from "@/pages/MergePage"
+import { BrowserRouter, Route, Routes } from "react-router"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
+import DocumentDetailPage from "@/pages/DocumentDetailPage"
+import DocumentsPage from "@/pages/DocumentsPage"
+import HomePage from "../pages/HomePage"
+import LoginPage from "@/pages/LoginPage"
+import MergePage from "@/pages/MergePage"
+import SignupPage from "@/pages/SignupPage"
+import WorkingSaveDemoPage from "@/pages/WorkingSaveDemoPage"
+import LandingConceptDemoPage from "@/pages/LandingConceptDemoPage"
+import PageLayout from "../layouts/PageLayout"
 
 export const Router = () => {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/demo/working-save-flow" element={<WorkingSaveDemoPage />} />
+        <Route path="/demo/landing-concept" element={<LandingConceptDemoPage />} />
         <Route path="/" element={<PageLayout />}>
           <Route index element={<HomePage />} />
           <Route path="/signup" element={<SignupPage />} />

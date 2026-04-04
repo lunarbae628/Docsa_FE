@@ -57,6 +57,7 @@ const RAW_RUNTIME_STATE =
           ["class-variance-authority", "npm:0.7.1"],\
           ["clsx", "npm:2.1.1"],\
           ["diff-match-patch", "npm:1.0.5"],\
+          ["framer-motion", "virtual:d9650954c7f1725ea712d2e40695de9ea5d1c0fa9b89379134c62909d440d91b03d6c37e2823804a3404472b90a5bec73c82193190dd3c4db4c9e9edd75db91e#npm:12.38.0"],\
           ["frontend", "workspace:."],\
           ["globals", "npm:16.0.0"],\
           ["lucide-react", "virtual:d9650954c7f1725ea712d2e40695de9ea5d1c0fa9b89379134c62909d440d91b03d6c37e2823804a3404472b90a5bec73c82193190dd3c4db4c9e9edd75db91e#npm:0.525.0"],\
@@ -4025,6 +4026,39 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["framer-motion", [\
+      ["npm:12.38.0", {\
+        "packageLocation": "../../../../.yarn/berry/cache/framer-motion-npm-12.38.0-5ed9a26b7e-10c0.zip/node_modules/framer-motion/",\
+        "packageDependencies": [\
+          ["framer-motion", "npm:12.38.0"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:d9650954c7f1725ea712d2e40695de9ea5d1c0fa9b89379134c62909d440d91b03d6c37e2823804a3404472b90a5bec73c82193190dd3c4db4c9e9edd75db91e#npm:12.38.0", {\
+        "packageLocation": "./.yarn/__virtual__/framer-motion-virtual-4fdb12677c/5/.yarn/berry/cache/framer-motion-npm-12.38.0-5ed9a26b7e-10c0.zip/node_modules/framer-motion/",\
+        "packageDependencies": [\
+          ["@emotion/is-prop-valid", null],\
+          ["@types/emotion__is-prop-valid", null],\
+          ["@types/react", "npm:19.1.2"],\
+          ["@types/react-dom", "virtual:d9650954c7f1725ea712d2e40695de9ea5d1c0fa9b89379134c62909d440d91b03d6c37e2823804a3404472b90a5bec73c82193190dd3c4db4c9e9edd75db91e#npm:19.1.3"],\
+          ["framer-motion", "virtual:d9650954c7f1725ea712d2e40695de9ea5d1c0fa9b89379134c62909d440d91b03d6c37e2823804a3404472b90a5bec73c82193190dd3c4db4c9e9edd75db91e#npm:12.38.0"],\
+          ["motion-dom", "npm:12.38.0"],\
+          ["motion-utils", "npm:12.36.0"],\
+          ["react", "npm:19.1.0"],\
+          ["react-dom", "virtual:d9650954c7f1725ea712d2e40695de9ea5d1c0fa9b89379134c62909d440d91b03d6c37e2823804a3404472b90a5bec73c82193190dd3c4db4c9e9edd75db91e#npm:19.1.0"],\
+          ["tslib", "npm:2.8.1"]\
+        ],\
+        "packagePeers": [\
+          "@emotion/is-prop-valid",\
+          "@types/emotion__is-prop-valid",\
+          "@types/react-dom",\
+          "@types/react",\
+          "react-dom",\
+          "react"\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["frontend", [\
       ["workspace:.", {\
         "packageLocation": "./",\
@@ -4058,6 +4092,7 @@ const RAW_RUNTIME_STATE =
           ["class-variance-authority", "npm:0.7.1"],\
           ["clsx", "npm:2.1.1"],\
           ["diff-match-patch", "npm:1.0.5"],\
+          ["framer-motion", "virtual:d9650954c7f1725ea712d2e40695de9ea5d1c0fa9b89379134c62909d440d91b03d6c37e2823804a3404472b90a5bec73c82193190dd3c4db4c9e9edd75db91e#npm:12.38.0"],\
           ["frontend", "workspace:."],\
           ["globals", "npm:16.0.0"],\
           ["lucide-react", "virtual:d9650954c7f1725ea712d2e40695de9ea5d1c0fa9b89379134c62909d440d91b03d6c37e2823804a3404472b90a5bec73c82193190dd3c4db4c9e9edd75db91e#npm:0.525.0"],\
@@ -4834,6 +4869,25 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../../.yarn/berry/cache/mkdirp-npm-3.0.1-f94bfa769e-10c0.zip/node_modules/mkdirp/",\
         "packageDependencies": [\
           ["mkdirp", "npm:3.0.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["motion-dom", [\
+      ["npm:12.38.0", {\
+        "packageLocation": "../../../../.yarn/berry/cache/motion-dom-npm-12.38.0-bb764081e0-10c0.zip/node_modules/motion-dom/",\
+        "packageDependencies": [\
+          ["motion-dom", "npm:12.38.0"],\
+          ["motion-utils", "npm:12.36.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["motion-utils", [\
+      ["npm:12.36.0", {\
+        "packageLocation": "../../../../.yarn/berry/cache/motion-utils-npm-12.36.0-30fa2f2bf9-10c0.zip/node_modules/motion-utils/",\
+        "packageDependencies": [\
+          ["motion-utils", "npm:12.36.0"]\
         ],\
         "linkType": "HARD"\
       }]\

@@ -20,7 +20,7 @@ const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
     >
       <defs>
         <filter id="glow-main" filterUnits="userSpaceOnUse" x="452" y="-120" width="96" height="4240">
-          <feGaussianBlur stdDeviation="8" result="blur" />
+          <feGaussianBlur stdDeviation="4.5" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
@@ -42,15 +42,25 @@ const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
         d={mainPath}
         fill="none"
         stroke="#fb923c"
-        strokeWidth="6"
+        strokeWidth="5"
         strokeLinecap="round"
         filter="url(#glow-main)"
         style={{ pathLength: mainPathLength }}
       />
 
       <motion.circle
-        r="5"
+        r="7"
+        fill="rgba(251,146,60,0.12)"
+        style={{
+          offsetPath: `path('${mainPath}')`,
+          offsetDistance: useTransform(mainPathLength, (v) => `${v * 100}%`),
+        }}
+      />
+      <motion.circle
+        r="4.75"
         fill="#fff"
+        stroke="rgba(251,146,60,0.85)"
+        strokeWidth="1.35"
         style={{
           offsetPath: `path('${mainPath}')`,
           offsetDistance: useTransform(mainPathLength, (v) => `${v * 100}%`),
@@ -70,8 +80,19 @@ const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
         }}
       />
       <motion.circle
-        r="5"
+        r="7"
+        fill="rgba(236,72,153,0.12)"
+        style={{
+          offsetPath: `path('${branchPath}')`,
+          offsetDistance: useTransform(branchPathLength, (v) => `${v * 100}%`),
+          opacity: useTransform(branchPathLength, [0, 0.01, 0.99, 1], [0, 1, 1, 0]),
+        }}
+      />
+      <motion.circle
+        r="4.75"
         fill="#fff"
+        stroke="rgba(236,72,153,0.9)"
+        strokeWidth="1.35"
         style={{
           offsetPath: `path('${branchPath}')`,
           offsetDistance: useTransform(branchPathLength, (v) => `${v * 100}%`),

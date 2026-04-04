@@ -138,6 +138,9 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           paragraph: {
             class: Paragraph,
             inlineToolbar: true,
+            config: {
+              preserveBlank: true,
+            },
           },
         },
         onChange: async () => {

@@ -9,7 +9,7 @@ import { Button } from "./ui/button"
 import { apiClient } from "@/api/apiClient"
 import { useRef, useState, useMemo, useCallback } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { calculateBlockDiff } from "@/lib/diffUtils"
+import { calculateBlockDiffById } from "@/lib/diffUtils"
 
 import { useDialog, alertDialog } from "./ui/alert-dialog"
 import { useNavigate } from "react-router"
@@ -120,20 +120,7 @@ export default function DocumentContent({
       console.error("저장 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "저장에 실패했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
+      const errorMessage = error.message || "저장에 실패했습니다."
 
       console.log("errorMessage", errorMessage)
 
@@ -174,20 +161,7 @@ export default function DocumentContent({
       console.error("기록 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      let errorMessage = "기록에 실패했습니다."
-
-      try {
-        // OpenAPI Generator의 ResponseError 구조에 맞게 파싱
-        if (error?.response && error.response.status === 400) {
-          const errorData = await error.response.json()
-          console.log("errorData", errorData)
-          if (errorData?.message) {
-            errorMessage = errorData.message
-          }
-        }
-      } catch (parseError) {
-        console.error("에러 메시지 파싱 실패:", parseError)
-      }
+      const  errorMessage =  error.message || "기록에 실패했습니다."
 
       console.log("errorMessage", errorMessage)
 
@@ -251,7 +225,7 @@ export default function DocumentContent({
     } else {
       // 원본 데이터와 현재 데이터를 비교하여 변경된 블록만 추출
       const prevCommitDiffEditorData = convertToEditorData(commitDiffData)
-      const blockDiffs = calculateBlockDiff(
+      const blockDiffs = calculateBlockDiffById(
         prevCommitDiffEditorData,
         currentData,
       )

@@ -110,11 +110,8 @@ export function useDocumentContent({
           default:
             throw new Error(`지원하지 않는 documentMode: ${documentMode}`)
         }
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "데이터를 가져오는 중 오류가 발생했습니다"
+      } catch (err: any) {
+        const errorMessage = err.message || "데이터를 가져오는 중 오류가 발생했습니다"
         setError(errorMessage)
         console.error("useDocumentContent 오류:", err)
       } finally {

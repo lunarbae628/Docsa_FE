@@ -19,8 +19,15 @@ const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
       preserveAspectRatio="none"
     >
       <defs>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="6" result="blur" />
+        <filter id="glow-main" filterUnits="userSpaceOnUse" x="452" y="-120" width="96" height="4240">
+          <feGaussianBlur stdDeviation="8" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="glow-branch" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="4.5" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
@@ -34,28 +41,13 @@ const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
       <motion.path
         d={mainPath}
         fill="none"
-        stroke="rgba(249,115,22,0.38)"
-        strokeWidth="18"
+        stroke="#fb923c"
+        strokeWidth="6"
         strokeLinecap="round"
-        filter="url(#glow)"
+        filter="url(#glow-main)"
         style={{ pathLength: mainPathLength }}
       />
-      <motion.path
-        d={mainPath}
-        fill="none"
-        stroke="rgba(251,146,60,0.92)"
-        strokeWidth="8"
-        strokeLinecap="round"
-        style={{ pathLength: mainPathLength }}
-      />
-      <motion.circle
-        r="10"
-        fill="rgba(249,115,22,0.32)"
-        style={{
-          offsetPath: `path('${mainPath}')`,
-          offsetDistance: useTransform(mainPathLength, (v) => `${v * 100}%`),
-        }}
-      />
+
       <motion.circle
         r="5"
         fill="#fff"
@@ -71,7 +63,7 @@ const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
         stroke="#ec4899"
         strokeWidth="5"
         strokeLinecap="round"
-        filter="url(#glow)"
+        filter="url(#glow-branch)"
         style={{
           pathLength: branchPathLength,
           opacity: useTransform(mainPathLength, [0.12, 0.13], [0, 1]),

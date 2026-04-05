@@ -6,11 +6,11 @@ import { useAuth } from '@/hooks/useAuth';
 
 const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
   const smoothProgress = useSpring(scrollYProgress, { stiffness: 80, damping: 30 });
-  const mainPathLength = useTransform(smoothProgress, [0, 1], [0.15, 0.95]);
-  const branchPathLength = useTransform(mainPathLength, [0.125, 0.875], [0, 1]);
+  const mainPathLength = useTransform(smoothProgress, [0, 0.1, 0.7, 1], [0, 0.01, 0.55, 1]);
+  const branchPathLength = useTransform(mainPathLength, [0.24, 0.7], [0, 1]);
 
   const mainPath = 'M 500 0 L 500 4000';
-  const branchPath = 'M 500 500 C 500 900, 600 900, 600 1300 L 600 2700 C 600 3100, 500 3100, 500 3500';
+  const branchPath = 'M 500 960 C 500 1120, 600 1180, 600 1420 L 600 2260 C 600 2480, 500 2520, 500 2800';
 
   return (
     <svg
@@ -76,7 +76,7 @@ const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
         filter="url(#glow-branch)"
         style={{
           pathLength: branchPathLength,
-          opacity: useTransform(mainPathLength, [0.12, 0.13], [0, 1]),
+          opacity: useTransform(mainPathLength, [0.24, 0.28], [0, 1]),
         }}
       />
       <motion.circle
@@ -106,12 +106,12 @@ const GraphSpineSVG = ({ scrollYProgress }: { scrollYProgress: any }) => {
 const GraphNode = ({ targetProgress, xPos, color, title, subtitle, desc, side, scrollYProgress }: any) => {
   const isLeft = side === 'left';
   const smoothProgress = useSpring(scrollYProgress, { stiffness: 80, damping: 30 });
-  const mainPathLength = useTransform(smoothProgress, [0, 1], [0.15, 0.95]);
+  const mainPathLength = useTransform(smoothProgress, [0, 0.1, 0.7, 1], [0, 0.01, 0.55, 1]);
 
-  const nodeScale = useTransform(mainPathLength, [targetProgress - 0.05, targetProgress, targetProgress + 0.05], [0.8, 2, 1]);
-  const nodeOpacity = useTransform(mainPathLength, [targetProgress - 0.1, targetProgress], [0.2, 1]);
-  const cardOpacity = useTransform(mainPathLength, [targetProgress - 0.1, targetProgress], [0, 1]);
-  const cardY = useTransform(mainPathLength, [targetProgress - 0.1, targetProgress], [30, 0]);
+  const nodeScale = useTransform(mainPathLength, [targetProgress - 0.025, targetProgress, targetProgress + 0.04], [0.92, 1.6, 1]);
+  const nodeOpacity = useTransform(mainPathLength, [targetProgress - 0.04, targetProgress], [0.35, 1]);
+  const cardOpacity = useTransform(mainPathLength, [targetProgress - 0.035, targetProgress + 0.015], [0, 1]);
+  const cardY = useTransform(mainPathLength, [targetProgress - 0.035, targetProgress + 0.015], [18, 0]);
 
   return (
     <div className="absolute w-full h-0 z-10" style={{ top: `${targetProgress * 100}%` }}>
@@ -144,10 +144,10 @@ const GraphNode = ({ targetProgress, xPos, color, title, subtitle, desc, side, s
             {subtitle.split(' — ')[1]}
           </span>
         </div>
-        <h3 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tighter uppercase italic drop-shadow-xl">
+        <h3 className={`text-4xl md:text-6xl font-black text-white tracking-tighter uppercase italic drop-shadow-xl ${desc ? 'mb-6' : 'mb-0'}`}>
           {title}
         </h3>
-        <p className="text-gray-500 text-sm md:text-lg font-light leading-relaxed max-w-sm">{desc}</p>
+        {desc ? <p className="text-gray-500 text-sm md:text-lg font-light leading-relaxed max-w-sm">{desc}</p> : null}
       </motion.div>
     </div>
   );
@@ -159,7 +159,7 @@ export default function LandingConceptDemoPage() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
-    offset: ['start start', 'end end'],
+    offset: ['start 80%', 'end end'],
   });
 
   const badFiles = [
@@ -278,50 +278,61 @@ export default function LandingConceptDemoPage() {
         </motion.div>
       </section>
 
-      <section ref={containerRef} className="relative w-full max-w-[1200px] mx-auto h-[400vh] mb-40">
+      <section ref={containerRef} className="relative w-full max-w-[1200px] mx-auto h-[300vh] mb-40">
         <GraphSpineSVG scrollYProgress={scrollYProgress} />
 
         <GraphNode
-          targetProgress={0.125}
+          targetProgress={0.12}
           xPos={50}
           color="#f97316"
           side="left"
-          subtitle="V1.0.0 — GENESIS"
-          title="완벽한 원본"
-          desc="오렌지색 메인 라인은 절대 훼손되지 않는 단 하나의 진실입니다. 위에서부터 그려지는 흐름을 따라오세요."
+          subtitle="WRITE — WORKSPACE"
+          title="문서 작성"
+          desc="문서는 작업장에서 바로 편집합니다. 초안은 파일 복사본이 아니라 하나의 흐름 안에서 시작되고, 이후 수정도 같은 맥락 위에서 이어집니다."
           scrollYProgress={scrollYProgress}
         />
 
         <GraphNode
-          targetProgress={0.375}
-          xPos={60}
-          color="#ec4899"
-          side="right"
-          subtitle="FEAT/01 — BRANCH OUT"
-          title="안전한 분기"
-          desc="메인 노드에서 핑크색 브랜치가 뻗어 나옵니다. 원본을 건드리지 않고 새로운 아이디어를 실험할 수 있는 독립된 공간입니다."
-          scrollYProgress={scrollYProgress}
-        />
-
-        <GraphNode
-          targetProgress={0.625}
-          xPos={60}
-          color="#ec4899"
-          side="right"
-          subtitle="FEAT/02 — COMMIT"
-          title="데이터 축적"
-          desc="파일명 복사 대신, 이 핑크색 브랜치 위에 수정 사항들이 차곡차곡 쌓입니다. 시각적으로 명확하게 구분됩니다."
-          scrollYProgress={scrollYProgress}
-        />
-
-        <GraphNode
-          targetProgress={0.875}
+          targetProgress={0.24}
           xPos={50}
           color="#f97316"
           side="left"
-          subtitle="V2.0.0 — MERGE"
-          title="완벽한 통합"
-          desc="수정이 끝난 핑크색 브랜치가 다시 오렌지색 메인 축으로 빨려 들어가며 완벽하게 병합됩니다. '진짜최종'은 이렇게 탄생합니다."
+          subtitle="COMMIT — SNAPSHOT"
+          title="기록 남기기"
+          desc="의미 있는 시점마다 기록을 남깁니다. 어떤 상태가 언제 만들어졌는지 흐름으로 축적되기 때문에 작업 과정과 결과를 함께 관리할 수 있습니다."
+          scrollYProgress={scrollYProgress}
+        />
+
+        <GraphNode
+          targetProgress={0.36}
+          xPos={60}
+          color="#ec4899"
+          side="right"
+          subtitle="BRANCH — SAFE DRAFT"
+          title="분기된 수정안"
+          desc="기록을 남긴 뒤 다른 방향의 수정안이 필요하면 여기서 브랜치로 갈라집니다. 메인 문서는 그대로 두고, 새 브랜치에서 수정안을 안전하게 이어갈 수 있습니다."
+          scrollYProgress={scrollYProgress}
+        />
+
+        <GraphNode
+          targetProgress={0.5}
+          xPos={60}
+          color="#ec4899"
+          side="right"
+          subtitle="COMPARE — REVIEW"
+          title="비교와 검토"
+          desc="분기된 작업은 기록과 작업장을 바로 비교하면서 검토합니다. 어떤 문장이 바뀌었는지 흐름 위에서 확인할 수 있어 의사결정이 빨라집니다."
+          scrollYProgress={scrollYProgress}
+        />
+
+        <GraphNode
+          targetProgress={0.7}
+          xPos={50}
+          color="#f97316"
+          side="left"
+          subtitle="MERGE — BACK TO MAIN"
+          title="확인 후 병합"
+          desc="검토가 끝난 수정안만 메인 흐름으로 병합합니다. 최종본을 파일명으로 구분하는 대신, 비교를 거친 변경만 기준 문서에 반영합니다."
           scrollYProgress={scrollYProgress}
         />
       </section>

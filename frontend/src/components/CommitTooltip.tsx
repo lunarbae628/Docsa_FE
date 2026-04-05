@@ -13,18 +13,18 @@ const CommitTooltip = React.memo(function CommitTooltip({
 
   return createPortal(
     <div
-      className="fixed p-3 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[250px] max-w-[300px] pointer-events-none"
+      className="pointer-events-none fixed min-w-[220px] max-w-[280px] rounded-2xl border border-slate-800 bg-slate-950/96 px-3 py-3 shadow-[0_18px_44px_rgba(15,23,42,0.45)] backdrop-blur"
       style={{
         left: hoveredCommit.position.x,
         top: hoveredCommit.position.y,
         zIndex: 9999,
       }}
     >
-      <div className="font-semibold text-sm text-gray-900 mb-2">
+      <div className="mb-2 text-sm font-semibold text-white">
         {hoveredCommit.commit.title}
       </div>
       <div
-        className="text-xs text-gray-600 leading-relaxed"
+        className="text-xs leading-relaxed text-slate-300"
         style={{
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
@@ -33,8 +33,8 @@ const CommitTooltip = React.memo(function CommitTooltip({
         {hoveredCommit.commit.description}
       </div>
       {/* 화살표 */}
-      <div className="absolute bottom-full left-4 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-l-transparent border-r-transparent border-b-white"></div>
-      <div className="absolute bottom-full left-4 w-0 h-0 border-l-[7px] border-r-[7px] border-b-[7px] border-l-transparent border-r-transparent border-b-gray-200 -mb-px"></div>
+      <div className="absolute bottom-full left-4 h-0 w-0 border-b-[6px] border-l-[6px] border-r-[6px] border-b-slate-950 border-l-transparent border-r-transparent" />
+      <div className="absolute bottom-full left-4 -mb-px h-0 w-0 border-b-[7px] border-l-[7px] border-r-[7px] border-b-slate-800 border-l-transparent border-r-transparent" />
     </div>,
     document.body,
   )

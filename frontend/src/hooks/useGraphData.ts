@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { type Node, type Edge, MarkerType, Position } from "reactflow"
+import { type Edge, Position } from "reactflow"
 import type { GraphDataType, Commit, GraphNode } from "@/types/graph"
 import { getBranchColor, GRAPH_LAYOUT } from "@/lib/graphUtils"
 import { useQuery } from "@tanstack/react-query"
@@ -137,7 +137,7 @@ export function useGraphRender({
 
       // 연결 순서(depth)에 따른 y 위치 조정
       const depth = commitDepths.get(commit.id) || 0
-      const yPosition = depth * 170 + GRAPH_LAYOUT.BASE_Y_OFFSET
+      const yPosition = depth * GRAPH_LAYOUT.ROW_SPACING + GRAPH_LAYOUT.BASE_Y_OFFSET
 
       // 브랜치별 정보 업데이트
       if (!infoByBranch[commit.branchId]) {
@@ -161,6 +161,7 @@ export function useGraphRender({
 
       return {
         id: `commit-${commit.id.toString()}`,
+        type: "commitNode",
         position: { x: xPosition, y: yPosition },
         data: {
           nodeType: "commit",
@@ -172,11 +173,11 @@ export function useGraphRender({
           showMergeButton,
         },
         style: {
-          backgroundColor: isCurrentCommit ? "#fefce8" : "white",
-          border: `2px solid ${isCurrentCommit ? "#eab308" : color}`,
-          borderRadius: "8px",
-          width: "auto",
-          fontSize: "12px",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          width: GRAPH_LAYOUT.NODE_WIDTH,
+          height: GRAPH_LAYOUT.NODE_HEIGHT,
         },
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
@@ -193,58 +194,20 @@ export function useGraphRender({
       const sourceCommit = data.commits.find((c) => c.id === edge.from)
       const targetCommit = data.commits.find((c) => c.id === edge.to)
       const isSameBranch = sourceCommit?.branchId === targetCommit?.branchId
-
-      // 브랜치별 인덱스 계산 (좌우 방향 결정용)
-      const sourceBranchIndex = data.branches.findIndex(
-        (b) => b.id === sourceCommit?.branchId,
+      const edgeColor = getBranchColor(
+        targetCommit
+          ? (data.branches.find((b) => b.id === targetCommit.branchId)?.name ?? "branch")
+          : "branch",
       )
-      const targetBranchIndex = data.branches.findIndex(
-        (b) => b.id === targetCommit?.branchId,
-      )
-
-      // 다른 브랜치로의 연결인 경우 좌우 핸들 사용
-      let sourceHandle: string | undefined
-      let targetHandle: string | undefined
-
-      if (!isSameBranch) {
-        // target 커밋과 같은 브랜치에서 더 위에 있는 노드가 있는지 확인
-        const targetDepth = commitDepths.get(edge.to) || 0
-        const hasUpperNodesInTargetBranch = data.commits.some((commit) => {
-          const commitDepth = commitDepths.get(commit.id) || 0
-          return (
-            commit.branchId === targetCommit?.branchId &&
-            commit.id !== edge.to &&
-            commitDepth < targetDepth
-          )
-        })
-
-        // 타겟이 소스보다 오른쪽에 있으면 소스는 right, 타겟은 left
-        if (targetBranchIndex > sourceBranchIndex) {
-          sourceHandle = "right"
-          // 상위에 노드가 있으면 left, 없으면 top
-          targetHandle = hasUpperNodesInTargetBranch ? "left" : "top"
-        } else {
-          sourceHandle = "left"
-          // 상위에 노드가 있으면 right, 없으면 top
-          targetHandle = hasUpperNodesInTargetBranch ? "right" : "top"
-        }
-      }
 
       return {
         id: `edge-${edge.from}-${edge.to}`,
         source: `commit-${edge.from.toString()}`,
         target: `commit-${edge.to.toString()}`,
-        sourceHandle,
-        targetHandle,
-        type: isSameBranch ? "smoothstep" : "default",
-        animated: !isSameBranch,
+        type: "timeline",
         style: {
-          stroke: isSameBranch ? "#6b7280" : "#10b981",
-          strokeWidth: 2,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: isSameBranch ? "#6b7280" : "#10b981",
+          stroke: edgeColor,
+          strokeWidth: isSameBranch ? 3 : 2.5,
         },
       }
     })
@@ -271,9 +234,9 @@ export function useGraphRender({
         let yPosition: number
 
         if (branchInfo) {
-          // 브랜치의 가장 아래 위치에서 80px 아래에 배치
+          // 브랜치의 가장 아래 위치에서 아래로 배치
           xPosition = branchInfo.xPosition
-          yPosition = branchInfo.lastYPosition + GRAPH_LAYOUT.BASE_Y_OFFSET + 20
+          yPosition = branchInfo.lastYPosition + GRAPH_LAYOUT.WORKSPACE_OFFSET
         } else {
           const branchIndex = data.branches.findIndex((b) => b.id === branch.id)
           xPosition =
@@ -283,7 +246,8 @@ export function useGraphRender({
           if (branch.fromCommitId) {
             const depth = commitDepths.get(branch.fromCommitId) + 1
             if (depth) {
-              yPosition = depth * 170 + GRAPH_LAYOUT.BASE_Y_OFFSET
+              yPosition =
+                depth * GRAPH_LAYOUT.ROW_SPACING + GRAPH_LAYOUT.BASE_Y_OFFSET
             }
           } else {
             // 커밋이 없는 브랜치의 경우 기본 위치 설정
@@ -298,6 +262,7 @@ export function useGraphRender({
 
         tempNodesArray.push({
           id: saveNodeId,
+          type: "tempNode",
           position: { x: xPosition, y: yPosition },
           data: {
             nodeType: "temp",
@@ -310,12 +275,12 @@ export function useGraphRender({
             description: "저장된 변경사항",
           },
           style: {
-            backgroundColor: "#f9fafb",
-            border: `2px dashed ${color}`,
-            borderRadius: "8px",
-            width: "auto",
-            fontSize: "12px",
-            opacity: 0.8,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            width: GRAPH_LAYOUT.NODE_WIDTH,
+            height: GRAPH_LAYOUT.NODE_HEIGHT,
+            opacity: 1,
           },
           sourcePosition: Position.Bottom,
           targetPosition: Position.Top,
@@ -327,78 +292,26 @@ export function useGraphRender({
             id: `temp-edge-${branch.id}`,
             source: `commit-${branch.leafCommitId.toString()}`,
             target: saveNodeId,
-            type: "smoothstep",
-            animated: true,
+            type: "timeline",
             style: {
-              stroke: "#10b981",
-              strokeWidth: 2,
+              stroke: color,
+              strokeWidth: 2.5,
             },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color: "#10b981",
-            },
+            data: { dashed: true },
           })
         }
 
         if (!branch.leafCommitId && branch.fromCommitId) {
-          // 브랜치별 인덱스 계산 (좌우 방향 결정용)
-          const sourceCommitBranchId = data.commits.find(
-            (c) => c.id === branch.fromCommitId,
-          ).branchId
-
-          const sourceBranchIndex = data.branches.findIndex(
-            (b) => b.id === sourceCommitBranchId,
-          )
-          const targetBranchIndex = data.branches.findIndex(
-            (b) => b.id === branch.id,
-          )
-
-          // 다른 브랜치로의 연결인 경우 좌우 핸들 사용
-          let sourceHandle: string | undefined
-          let targetHandle: string | undefined
-
-          // target 브랜치에서 더 위에 있는 노드가 있는지 확인 (임시 저장 노드의 경우)
-          const hasUpperNodesInTargetBranch =
-            data.commits.some((commit) => {
-              return commit.branchId === branch.id
-            }) ||
-            (branch.leafCommitId &&
-              data.commits.some((commit) => {
-                const commitDepth = commitDepths.get(commit.id) || 0
-                const leafDepth = commitDepths.get(branch.leafCommitId) || 0
-                return (
-                  commit.branchId === branch.id &&
-                  commit.id !== branch.leafCommitId &&
-                  commitDepth <= leafDepth
-                )
-              }))
-
-          if (targetBranchIndex > sourceBranchIndex) {
-            sourceHandle = "right"
-            // 상위에 노드가 있으면 left, 없으면 top
-            targetHandle = hasUpperNodesInTargetBranch ? "left" : "top"
-          } else {
-            sourceHandle = "left"
-            // 상위에 노드가 있으면 right, 없으면 top
-            targetHandle = hasUpperNodesInTargetBranch ? "right" : "top"
-          }
-
           tempEdgesArray.push({
             id: `temp-edge-${branch.id}`,
             source: `commit-${branch.fromCommitId.toString()}`,
             target: saveNodeId,
-            sourceHandle,
-            targetHandle,
-            type: "default",
-            animated: true,
+            type: "timeline",
             style: {
-              stroke: "#10b981",
-              strokeWidth: 2,
+              stroke: color,
+              strokeWidth: 2.5,
             },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color: "#10b981",
-            },
+            data: { dashed: true },
           })
         }
       }

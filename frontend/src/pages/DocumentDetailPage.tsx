@@ -222,6 +222,34 @@ export default function DocumentDetailPage() {
     },
   })
 
+  const renameBranchMutation = useMutation({
+    mutationFn: async ({
+      documentId,
+      branchId,
+      newName,
+    }: {
+      documentId: number
+      branchId: number
+      newName: string
+    }) => {
+      await apiClient.branch.renameBranch({
+        documentId,
+        branchId,
+        branchRenameRequest: {
+          newName,
+        },
+      })
+    },
+    onSuccess: () => {
+      window.location.reload()
+    },
+    onError: (error: any) => {
+      console.error("브랜치 이름 변경 중 오류:", error)
+      const errorMessage = error.message || "브랜치 이름 변경 중 오류가 발생했습니다."
+      alertDialog(errorMessage, "오류", "destructive")
+    },
+  })
+
   // 커밋 삭제 mutation
   const deleteCommitMutation = useMutation({
     mutationFn: async ({
@@ -295,6 +323,14 @@ export default function DocumentDetailPage() {
     navigate(`/documents/${documentId}`)
   }
 
+  const handleBranchRename = async (branchId: number, newName: string) => {
+    renameBranchMutation.mutate({
+      documentId: Number.parseInt(documentId),
+      branchId,
+      newName,
+    })
+  }
+
   if (graphError) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -338,6 +374,7 @@ export default function DocumentDetailPage() {
             currentSaveId={mode === "save" ? saveId : null}
             onNodeMenuClick={handleNodeMenuClick}
             onBranchDelete={handleBranchDelete}
+            onBranchRename={handleBranchRename}
           />
         </div>
 

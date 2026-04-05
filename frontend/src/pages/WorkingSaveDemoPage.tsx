@@ -4,14 +4,27 @@ import {
   GitCompareArrows,
   GitMerge,
   Play,
+  Trash2,
   X,
 } from "lucide-react"
 import ResizableLayout from "@/layouts/ResizableLayout"
-import WorkingSaveDemoGraph from "@/components/WorkingSaveDemoGraph"
+import DocumentGraph from "@/components/DocumentGraph"
 import BranchEditModal from "@/components/BranchEditModal"
 import SaveCommitModal from "@/components/SaveCommitModal"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import type { GraphDataType } from "@/types/graph"
+import type { CommitNodeMenuType } from "@/components/CommitNode"
+import type { TempNodeMenuType } from "@/components/TempNode"
 
 type BranchRecord = {
   id: number
@@ -59,6 +72,11 @@ type BranchEditState = {
   isLastCommit: boolean
   currentBranchName: string
 } | null
+
+type DeleteDialogState =
+  | { type: "commit"; commitId: number }
+  | { type: "branch"; branchId: number }
+  | null
 
 type DiffRow = {
   leftLineNumber: number | null
@@ -291,6 +309,7 @@ export default function WorkingSaveDemoPage() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced")
   const [toast, setToast] = useState("main 작업장에서 문서를 편집 중입니다.")
   const [branchEditState, setBranchEditState] = useState<BranchEditState>(null)
+  const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null)
   const [isCommitModalOpen, setIsCommitModalOpen] = useState(false)
   const syncTimerRef = useRef<number | null>(null)
 
@@ -401,6 +420,21 @@ export default function WorkingSaveDemoPage() {
     currentCommit && currentCommit.branchId !== mainBranch.id,
   )
 
+  const currentBranchCommits = useMemo(() => {
+    if (!currentBranch) return []
+    return commits
+      .filter((commit) => commit.branchId === currentBranch.id)
+      .sort((a, b) => a.id - b.id)
+  }, [commits, currentBranch])
+
+  const canDeleteCurrentCommit = Boolean(
+    view.mode === "commit" &&
+      currentCommit &&
+      currentBranch &&
+      currentBranch.headCommitId === currentCommit.id &&
+      currentBranch.rootCommitId !== currentCommit.id,
+  )
+
   useEffect(() => {
     return () => {
       if (syncTimerRef.current) {
@@ -483,10 +517,9 @@ export default function WorkingSaveDemoPage() {
     )
     if (!targetCommit || !targetBranch) return
 
-    const isLastCommit = targetBranch.headCommitId === targetCommit.id
     setBranchEditState({
       commitId: targetCommit.id,
-      isLastCommit,
+      isLastCommit: false,
       currentBranchName: targetBranch.name,
     })
   }
@@ -501,13 +534,6 @@ export default function WorkingSaveDemoPage() {
       (branch) => branch.id === targetCommit?.branchId,
     )
     if (!targetCommit || !targetBranch) return
-
-    if (branchEditState.isLastCommit) {
-      openWorkspaceByBranch(targetBranch.id)
-      setToast(`${targetBranch.name} 작업장으로 다시 들어왔습니다.`)
-      setBranchEditState(null)
-      return
-    }
 
     const nextBranchId = getNextId(branches)
     const nextWorkspaceId = getNextId(workspaces)
@@ -570,10 +596,82 @@ export default function WorkingSaveDemoPage() {
     setToast(`두 버전을 나란히 비교 중입니다.`)
   }
 
-  const handleDirectMerge = () => {
-    if (!currentCommit || !mainWorkspace) return
+  const handleDeleteCurrentCommit = () => {
+    if (!canDeleteCurrentCommit || !currentCommit || !currentBranch) return
 
-    const sourceBranch = branches.find((branch) => branch.id === currentCommit.branchId)
+    const previousCommit = currentBranchCommits[currentBranchCommits.length - 2]
+    if (!previousCommit) return
+
+    setCommits((prev) => prev.filter((commit) => commit.id !== currentCommit.id))
+    setBranches((prev) =>
+      prev.map((branch) =>
+        branch.id === currentBranch.id
+          ? { ...branch, headCommitId: previousCommit.id }
+          : branch,
+      ),
+    )
+    setView({ mode: "commit", branchId: currentBranch.id, commitId: previousCommit.id })
+    setToast(`기록 "${currentCommit.title}"을 삭제했습니다.`)
+    setDeleteDialog(null)
+  }
+
+  const handleDeleteCommit = (commitId: number) => {
+    const targetCommit = commits.find((commit) => commit.id === commitId)
+    const targetBranch = branches.find((branch) => branch.id === targetCommit?.branchId)
+    if (!targetCommit || !targetBranch) return
+    if (
+      targetBranch.headCommitId !== targetCommit.id ||
+      targetBranch.rootCommitId === targetCommit.id
+    ) {
+      return
+    }
+
+    const branchCommits = commits
+      .filter((commit) => commit.branchId === targetBranch.id)
+      .sort((a, b) => a.id - b.id)
+    const previousCommit = branchCommits[branchCommits.length - 2]
+    if (!previousCommit) return
+
+    setCommits((prev) => prev.filter((commit) => commit.id !== targetCommit.id))
+    setBranches((prev) =>
+      prev.map((branch) =>
+        branch.id === targetBranch.id
+          ? { ...branch, headCommitId: previousCommit.id }
+          : branch,
+      ),
+    )
+    setView({ mode: "commit", branchId: targetBranch.id, commitId: previousCommit.id })
+    setToast(`기록 "${targetCommit.title}"을 삭제했습니다.`)
+    setDeleteDialog(null)
+  }
+
+  const handleDeleteBranch = (branchId: number) => {
+    if (!mainWorkspace) return
+
+    const targetBranch = branches.find((branch) => branch.id === branchId)
+    if (!targetBranch || targetBranch.id === mainBranch.id) return
+
+    const commitIds = new Set(
+      commits.filter((commit) => commit.branchId === targetBranch.id).map((commit) => commit.id),
+    )
+
+    setCommits((prev) => prev.filter((commit) => !commitIds.has(commit.id)))
+    setBranches((prev) => prev.filter((branch) => branch.id !== targetBranch.id))
+    setWorkspaces((prev) => prev.filter((workspace) => workspace.id !== targetBranch.saveId))
+    setView({ mode: "workspace", branchId: mainBranch.id, workspaceId: mainWorkspace.id })
+    setToast(`${targetBranch.name} 브랜치를 삭제하고 main 작업장으로 돌아왔습니다.`)
+    setDeleteDialog(null)
+  }
+
+  const handleDirectMerge = (targetCommitId?: number) => {
+    if (!mainWorkspace) return
+
+    const mergeCommit = targetCommitId
+      ? commits.find((commit) => commit.id === targetCommitId) ?? null
+      : currentCommit
+    if (!mergeCommit) return
+
+    const sourceBranch = branches.find((branch) => branch.id === mergeCommit.branchId)
     if (!sourceBranch || sourceBranch.id === mainBranch.id) return
 
     const nextCommitId = getNextId(commits)
@@ -581,7 +679,7 @@ export default function WorkingSaveDemoPage() {
       mainWorkspace.content,
       "",
       `--- ${sourceBranch.name} 변경 반영 ---`,
-      currentCommit.content,
+      mergeCommit.content,
     ].join("\n")
 
     setCommits((prev) => [
@@ -622,6 +720,54 @@ export default function WorkingSaveDemoPage() {
     setToast(`main 작업장에 ${sourceBranch.name} 내용을 병합했습니다.`)
   }
 
+  const handleGraphNodeMenuClick = (
+    type: CommitNodeMenuType | TempNodeMenuType,
+    targetId: number,
+  ) => {
+    switch (type) {
+      case "commit-view": {
+        const commit = commits.find((item) => item.id === targetId)
+        if (!commit) return
+        openCommit(commit.branchId, commit.id)
+        return
+      }
+      case "commit-compare": {
+        const commit = commits.find((item) => item.id === targetId)
+        if (!commit) return
+        handleCompareStart("commit", commit.id, commit.branchId)
+        return
+      }
+      case "commit-continueEdit":
+        handleContinueEditClick(targetId)
+        return
+      case "commit-delete":
+        setDeleteDialog({ type: "commit", commitId: targetId })
+        return
+      case "commit-merge":
+        handleDirectMerge(targetId)
+        return
+      case "temp-edit": {
+        const branch = branches.find((item) => item.saveId === targetId)
+        if (!branch) return
+        openWorkspaceByBranch(branch.id)
+        setToast(`${branch.name} 작업장을 열었습니다.`)
+        return
+      }
+    }
+  }
+
+  const handleBranchRename = (branchId: number, newName: string) => {
+    setBranches((prev) =>
+      prev.map((branch) =>
+        branch.id === branchId ? { ...branch, name: newName } : branch,
+      ),
+    )
+
+    if (view.branchId === branchId) {
+      setToast(`${newName} 브랜치 이름으로 변경했습니다.`)
+    }
+  }
+
   const rightTitle =
     view.mode === "workspace"
       ? `${currentBranch?.name ?? "branch"} 작업장`
@@ -641,7 +787,7 @@ export default function WorkingSaveDemoPage() {
           mainClassName="h-full bg-slate-100"
         >
           <div className="h-full bg-slate-100 p-3">
-            <WorkingSaveDemoGraph
+            <DocumentGraph
               data={graphData}
               mainBranch={mainBranch}
               currentBranchId={view.branchId}
@@ -652,28 +798,28 @@ export default function WorkingSaveDemoPage() {
                     ? String(view.baseId)
                     : null
               }
-              currentWorkspaceId={
+              currentSaveId={
                 view.mode === "workspace" ? String(view.workspaceId) : null
               }
-              compareBaseCommitId={
-                view.mode === "compare" && view.baseKind === "commit" ? view.baseId : null
-              }
-              compareTargetCommitId={
-                view.mode === "compare" && view.compareKind === "commit" ? view.compareId : null
-              }
-              compareBaseWorkspaceId={
-                view.mode === "compare" && view.baseKind === "workspace" ? view.baseId : null
-              }
-              compareTargetWorkspaceId={
-                view.mode === "compare" && view.compareKind === "workspace" ? view.compareId : null
-              }
-              onCommitOpen={openCommit}
-              onWorkspaceOpen={(workspaceId) => {
-                const branch = branches.find((item) => item.saveId === workspaceId)
-                if (!branch) return
-                openWorkspaceByBranch(branch.id)
-                setToast(`${branch.name} 작업장을 열었습니다.`)
+              onNodeMenuClick={handleGraphNodeMenuClick}
+              onBranchSelect={(branchId) => {
+                openWorkspaceByBranch(branchId)
+                const branch = branches.find((item) => item.id === branchId)
+                if (branch) {
+                  setToast(`${branch.name} 작업장을 열었습니다.`)
+                }
               }}
+              onBranchDelete={(branchId) => setDeleteDialog({ type: "branch", branchId })}
+              onBranchRename={handleBranchRename}
+              compareSelection={
+                view.mode === "compare"
+                  ? {
+                      active: true,
+                      baseKind: view.baseKind,
+                      baseId: view.baseId,
+                    }
+                  : null
+              }
               onCompareTargetPick={handleCompareTargetPick}
             />
           </div>
@@ -734,6 +880,20 @@ export default function WorkingSaveDemoPage() {
                       <Button size="sm" variant="outline" onClick={() => handleContinueEditClick(currentCommit.id)}>
                         <Play className="h-4 w-4" /> 이어서 작업하기
                       </Button>
+                      {canDeleteCurrentCommit ? (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() =>
+                            setDeleteDialog({
+                              type: "commit",
+                              commitId: currentCommit.id,
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" /> 기록 삭제
+                        </Button>
+                      ) : null}
                     </>
                   ) : null}
                   {view.mode === "compare" && compareBaseItem ? (
@@ -902,6 +1062,36 @@ export default function WorkingSaveDemoPage() {
         isLastCommit={branchEditState?.isLastCommit || false}
         defaultBranchName={branchEditState?.currentBranchName || ""}
       />
+
+      <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteDialog?.type === "commit" ? "기록을 삭제할까요?" : "브랜치를 삭제할까요?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDialog?.type === "commit"
+                ? "현재 보고 있는 기록만 삭제됩니다. 이전 기록과 작업장은 그대로 유지됩니다."
+                : "브랜치와 그 아래 기록들이 함께 제거됩니다. 이 데모에서는 작업장 삭제를 따로 만들지 않고 브랜치 정리의 일부로 처리합니다."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => {
+                if (deleteDialog?.type === "commit") {
+                  handleDeleteCommit(deleteDialog.commitId)
+                  return
+                }
+                handleDeleteBranch(deleteDialog.branchId)
+              }}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

@@ -1,14 +1,7 @@
 import React, { useState } from "react"
+import { Clock3, GitCommitHorizontal } from "lucide-react"
 import { Handle, Position } from "reactflow"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Eye, GitCompare, Play, Trash2, GitMerge } from "lucide-react"
 import type { Commit } from "@/types/graph"
-import { GRAPH_LAYOUT } from "@/lib/graphUtils"
 import CommitTooltip from "@/components/CommitTooltip"
 
 export type CommitNodeMenuType =
@@ -34,18 +27,31 @@ interface CommitNodeProps {
   setOpenDropdownId: (id: string | null) => void
 }
 
+const HANDLE_STYLE = {
+  background: "transparent",
+  border: "none",
+  width: 12,
+  height: 12,
+  opacity: 0,
+}
+
+function formatDateLabel(date: string) {
+  return new Date(date).toLocaleString("ko-KR", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 const CommitNode = React.memo(function CommitNode({
   commit,
-  branchName,
   color,
   isCurrentCommit,
   isLastCommit,
   showMergeButton,
   onNodeMenuClick,
-  openDropdownId,
-  setOpenDropdownId,
 }: CommitNodeProps) {
-  // 개별 노드의 hover 상태 관리
   const [hoveredCommit, setHoveredCommit] = useState<{
     commit: Commit
     position: { x: number; y: number }
@@ -53,154 +59,56 @@ const CommitNode = React.memo(function CommitNode({
 
   return (
     <>
-      {/* React Flow Handles for connections */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="right"
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Left}
-        id="left"
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="top"
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="target"
-        position={Position.Right}
-        id="right"
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="left"
-        style={{ background: "#555" }}
-      />
+      <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
+      <Handle type="source" position={Position.Bottom} style={HANDLE_STYLE} />
 
-      <DropdownMenu
-        open={openDropdownId === commit.id.toString()}
-        onOpenChange={(open) => {
-          setOpenDropdownId(open ? commit.id.toString() : null)
+      <div
+        className={`nodrag nopan group relative w-[220px] rounded-[22px] ${
+          isCurrentCommit ? "ring-4 ring-slate-200" : ""
+        }`}
+        onMouseEnter={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          setHoveredCommit({
+            commit,
+            position: {
+              x: rect.left + rect.width / 2 - 140,
+              y: rect.bottom + 12,
+            },
+          })
         }}
+        onMouseLeave={() => setHoveredCommit(null)}
       >
-        <DropdownMenuTrigger asChild>
+        <div
+          className={`w-full rounded-[22px] border bg-white p-4 text-left shadow-[0_16px_34px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.12)] ${
+            isCurrentCommit
+              ? "border-slate-900"
+              : "border-slate-200 hover:border-slate-300"
+          }`}
+        >
+          <div className="flex items-start gap-3">
           <div
-            className={`relative p-3 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${
-              isCurrentCommit ? "bg-yellow-50 hover:bg-yellow-100" : ""
-            }`}
-            style={{ width: GRAPH_LAYOUT.NODE_WIDTH }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onMouseEnter={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              setHoveredCommit({
-                commit,
-                position: {
-                  x: rect.left,
-                  y: rect.bottom + 8,
-                },
-              })
-            }}
-            onMouseLeave={() => setHoveredCommit(null)}
+            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: `${color}18`, color }}
           >
-            <div className="font-semibold text-sm truncate">{commit.title}</div>
-            <div className="text-xs text-gray-600 mt-1 truncate">
-              {commit.description}
+            <GitCommitHorizontal className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-lg font-semibold tracking-[-0.03em] text-slate-900">
+              {commit.title}
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {new Date(commit.createdAt).toLocaleString()}
+            <div className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
+              {commit.description || "기록된 변경사항"}
             </div>
-            <div
-              className="text-xs mt-2 px-2 py-1 rounded-full inline-block text-white"
-              style={{ backgroundColor: color }}
-            >
-              {branchName}
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
+              <Clock3 className="h-3.5 w-3.5" />
+              {formatDateLabel(commit.createdAt)}
             </div>
           </div>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-44" alignOffset={80}>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              onNodeMenuClick("commit-view", commit.id, isLastCommit)
-              setOpenDropdownId(null)
-            }}
-            className="cursor-pointer"
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            문서보기
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              onNodeMenuClick("commit-compare", commit.id, isLastCommit)
-              setOpenDropdownId(null)
-            }}
-            className="cursor-pointer"
-          >
-            <GitCompare className="h-4 w-4 mr-2" />
-            비교하기
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              onNodeMenuClick("commit-continueEdit", commit.id, isLastCommit)
-              setOpenDropdownId(null)
-            }}
-            className="cursor-pointer"
-          >
-            <Play className="h-4 w-4 mr-2" />
-            이어서 작업하기
-          </DropdownMenuItem>
-          {showMergeButton && (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation()
-                onNodeMenuClick("commit-merge", commit.id, isLastCommit)
-                setOpenDropdownId(null)
-              }}
-              className="cursor-pointer text-green-600 focus:text-green-600"
-            >
-              <GitMerge className="h-4 w-4 mr-2" />
-              여기로 병합하기
-            </DropdownMenuItem>
-          )}
-          {isLastCommit && (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation()
-                onNodeMenuClick("commit-delete", commit.id, isLastCommit)
-                setOpenDropdownId(null)
-              }}
-              className="cursor-pointer text-red-600 focus:text-red-600"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              삭제하기
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </div>
+        </div>
+      </div>
 
-      {/* 개별 노드의 Tooltip */}
-      {!openDropdownId && <CommitTooltip hoveredCommit={hoveredCommit} />}
+      <CommitTooltip hoveredCommit={hoveredCommit} />
     </>
   )
 })

@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import ResizableLayout from "@/layouts/ResizableLayout"
 import DocumentGraph from "@/components/DocumentGraph"
+import DocumentEditor from "@/components/DocumentEditor"
 import BranchEditModal from "@/components/BranchEditModal"
 import SaveCommitModal from "@/components/SaveCommitModal"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,10 @@ import {
 import type { GraphDataType } from "@/types/graph"
 import type { CommitNodeMenuType } from "@/components/CommitNode"
 import type { TempNodeMenuType } from "@/components/TempNode"
+import {
+  editorDataToMarkdown,
+  markdownToEditorData,
+} from "@/lib/editorMarkdown"
 
 type BranchRecord = {
   id: number
@@ -933,17 +938,35 @@ export default function WorkingSaveDemoPage() {
                 </div>
               ) : null}
 
-              <div className="flex-1 overflow-auto bg-slate-50 p-4">
+              <div
+                className={`flex-1 overflow-auto ${
+                  view.mode === "compare" ? "bg-slate-50 p-4" : "bg-white px-5 py-4"
+                }`}
+              >
                 {view.mode === "workspace" ? (
-                  <textarea
-                    value={currentWorkspace?.content ?? ""}
-                    onChange={(event) => handleWorkspaceChange(event.target.value)}
-                    className="h-full min-h-[760px] w-full rounded-2xl border border-slate-200 bg-white px-6 py-6 text-sm leading-7 text-slate-800 outline-none shadow-sm"
-                  />
+                  <div className="h-full min-h-[760px]">
+                    <DocumentEditor
+                      key={`workspace-${currentWorkspace?.id ?? "empty"}`}
+                      isEditable={true}
+                      initialData={markdownToEditorData(currentWorkspace?.content ?? "")}
+                      onDataChange={(data) =>
+                        handleWorkspaceChange(editorDataToMarkdown(data))
+                      }
+                      disableAutoUpdate={true}
+                      minimalChrome={true}
+                      contentLayout="document"
+                    />
+                  </div>
                 ) : view.mode === "commit" ? (
-                  <pre className="h-full min-h-[760px] whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white px-6 py-6 text-sm leading-7 text-slate-700 shadow-sm">
-                    {currentCommit?.content}
-                  </pre>
+                  <div className="h-full min-h-[760px]">
+                    <DocumentEditor
+                      key={`commit-${currentCommit?.id ?? "empty"}`}
+                      isEditable={false}
+                      initialData={markdownToEditorData(currentCommit?.content ?? "")}
+                      minimalChrome={true}
+                      contentLayout="document"
+                    />
+                  </div>
                 ) : (
                   <div className="grid h-full min-h-[760px] grid-cols-[1fr_84px_1fr] gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="min-w-0 border-r border-slate-200 bg-white">

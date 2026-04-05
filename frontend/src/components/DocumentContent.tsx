@@ -10,9 +10,11 @@ import { apiClient } from "@/api/apiClient"
 import { useRef, useState, useMemo, useCallback } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { calculateBlockDiffById } from "@/lib/diffUtils"
+import { editorDataToMarkdown, markdownToEditorData } from "@/lib/editorMarkdown"
 
 import { useDialog, alertDialog } from "./ui/alert-dialog"
 import { useNavigate } from "react-router"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
 
 export default function DocumentContent({
   documentMode,
@@ -53,6 +55,15 @@ export default function DocumentContent({
     mode: "save" | "commit"
   }>({ isOpen: false, mode: "save" })
   const [isContinuingAfterCommit, setIsContinuingAfterCommit] = useState(false)
+  const [markdownModal, setMarkdownModal] = useState<{
+    open: boolean
+    mode: "import" | "export"
+    value: string
+  }>({
+    open: false,
+    mode: "export",
+    value: "",
+  })
 
   const navigate = useNavigate()
 
@@ -198,6 +209,36 @@ export default function DocumentContent({
     setModalState({ isOpen: true, mode: "commit" })
   }
 
+  const handleOpenMarkdownExport = async () => {
+    const currentData =
+      (await editorRef.current?.saveData()) ?? originalEditorData ?? EditData
+
+    setMarkdownModal({
+      open: true,
+      mode: "export",
+      value: editorDataToMarkdown(currentData),
+    })
+  }
+
+  const handleOpenMarkdownImport = () => {
+    setMarkdownModal({
+      open: true,
+      mode: "import",
+      value: "",
+    })
+  }
+
+  const handleApplyMarkdownImport = async () => {
+    if (!editorRef.current) {
+      await alertDialog("에디터가 준비되지 않았습니다.", "오류", "destructive")
+      return
+    }
+
+    const nextData = markdownToEditorData(markdownModal.value)
+    await editorRef.current.updateData(nextData)
+    setMarkdownModal({ open: false, mode: "import", value: "" })
+  }
+
   // Modal 확인 핸들러
   const handleModalConfirm = async ({
     title,
@@ -310,6 +351,49 @@ export default function DocumentContent({
           isContinuingAfterCommit
         }
       />
+      <Dialog
+        open={markdownModal.open}
+        onOpenChange={(open) =>
+          setMarkdownModal((prev) => ({ ...prev, open }))
+        }
+      >
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {markdownModal.mode === "import"
+                ? "Markdown 가져오기"
+                : "Markdown 내보내기"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <textarea
+              value={markdownModal.value}
+              onChange={(event) =>
+                setMarkdownModal((prev) => ({
+                  ...prev,
+                  value: event.target.value,
+                }))
+              }
+              readOnly={markdownModal.mode === "export"}
+              className="min-h-[420px] w-full rounded-xl border border-slate-200 bg-white px-4 py-4 font-mono text-sm leading-6 text-slate-800 outline-none"
+            />
+            <div className="flex justify-end gap-2">
+              {markdownModal.mode === "export" ? (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(markdownModal.value)
+                  }}
+                >
+                  복사하기
+                </Button>
+              ) : (
+                <Button onClick={handleApplyMarkdownImport}>적용하기</Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 
@@ -326,6 +410,12 @@ export default function DocumentContent({
               disableAutoUpdate={true}
             />
             <div className="flex justify-end gap-10 mt-4 p-4 border-t">
+              <Button onClick={handleOpenMarkdownImport} variant="outline" size="2xl">
+                Markdown 가져오기
+              </Button>
+              <Button onClick={handleOpenMarkdownExport} variant="outline" size="2xl">
+                Markdown 내보내기
+              </Button>
               <Button
                 onClick={handleSave}
                 variant="outline"

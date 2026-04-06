@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import ResizableLayout from "@/layouts/ResizableLayout"
 import DocumentGraph from "@/components/DocumentGraph"
+import DocumentCompareView from "@/components/DocumentCompareView"
 import DocumentEditor from "@/components/DocumentEditor"
 import DocumentMergeView from "@/components/DocumentMergeView"
 import BranchEditModal from "@/components/BranchEditModal"
@@ -92,20 +93,6 @@ type DeleteDialogState =
   | { type: "commit"; commitId: number }
   | { type: "branch"; branchId: number }
   | null
-
-type DiffRow = {
-  leftLineNumber: number | null
-  rightLineNumber: number | null
-  leftText: string
-  rightText: string
-  leftType: "same" | "removed" | "changed" | "empty"
-  rightType: "same" | "added" | "changed" | "empty"
-}
-
-type CompareLineRow = {
-  lineNumber: number
-  text: string
-}
 
 const initialBranches: BranchRecord[] = [
   {
@@ -235,87 +222,6 @@ function buildGraphData(
   }
 }
 
-function buildDiffRows(left: string, right: string): DiffRow[] {
-  const leftLines = left.split("\n")
-  const rightLines = right.split("\n")
-  const maxLength = Math.max(leftLines.length, rightLines.length)
-
-  return Array.from({ length: maxLength }, (_, index) => {
-    const leftText = leftLines[index] ?? ""
-    const rightText = rightLines[index] ?? ""
-    const hasLeft = index < leftLines.length
-    const hasRight = index < rightLines.length
-
-    if (hasLeft && hasRight && leftText === rightText) {
-      return {
-        leftLineNumber: index + 1,
-        rightLineNumber: index + 1,
-        leftText,
-        rightText,
-        leftType: "same",
-        rightType: "same",
-      }
-    }
-
-    if (hasLeft && hasRight) {
-      return {
-        leftLineNumber: index + 1,
-        rightLineNumber: index + 1,
-        leftText,
-        rightText,
-        leftType: "changed",
-        rightType: "changed",
-      }
-    }
-
-    if (hasLeft) {
-      return {
-        leftLineNumber: index + 1,
-        rightLineNumber: null,
-        leftText,
-        rightText: "",
-        leftType: "removed",
-        rightType: "empty",
-      }
-    }
-
-    return {
-      leftLineNumber: null,
-      rightLineNumber: index + 1,
-      leftText: "",
-      rightText,
-      leftType: "empty",
-      rightType: "added",
-    }
-  })
-}
-
-function diffRowClass(type: DiffRow["leftType"] | DiffRow["rightType"]) {
-  switch (type) {
-    case "added":
-      return "bg-emerald-50"
-    case "removed":
-      return "bg-rose-50"
-    case "changed":
-      return "bg-sky-50"
-    default:
-      return "bg-white"
-  }
-}
-
-function diffTextClass(type: DiffRow["leftType"] | DiffRow["rightType"]) {
-  switch (type) {
-    case "added":
-      return "text-emerald-700"
-    case "removed":
-      return "text-rose-700"
-    case "changed":
-      return "text-sky-700"
-    default:
-      return "text-slate-700"
-  }
-}
-
 export default function WorkingSaveDemoPage() {
   const [branches, setBranches] = useState(initialBranches)
   const [commits, setCommits] = useState(initialCommits)
@@ -421,19 +327,6 @@ export default function WorkingSaveDemoPage() {
   const mainWorkspace = useMemo(() => {
     return workspaces.find((workspace) => workspace.branchId === mainBranch.id) ?? null
   }, [workspaces, mainBranch.id])
-
-  const diffRows = useMemo(() => {
-    if (!compareBaseItem || !compareTargetItem) return []
-    return buildDiffRows(compareBaseItem.content, compareTargetItem.content)
-  }, [compareBaseItem, compareTargetItem])
-
-  const baseRows = useMemo<CompareLineRow[]>(() => {
-    if (!compareBaseItem) return []
-    return compareBaseItem.content.split("\n").map((text, index) => ({
-      lineNumber: index + 1,
-      text,
-    }))
-  }, [compareBaseItem])
 
   const mergeSourceItem = useMemo(() => {
     if (view.mode !== "merge") return null
@@ -1143,102 +1036,19 @@ export default function WorkingSaveDemoPage() {
                       병합할 대상 기록 또는 작업장을 먼저 선택하세요.
                     </div>
                   )
+                ) : compareTargetItem ? (
+                  <DocumentCompareView
+                    leftData={markdownToEditorData(compareBaseItem?.content ?? "")}
+                    rightData={markdownToEditorData(compareTargetItem.content)}
+                    leftLabel={compareBaseItem?.title ?? "기준 버전"}
+                    leftSubtitle={compareBaseItem?.subtitle ?? "기준 버전"}
+                    rightLabel={compareTargetItem.title}
+                    rightSubtitle={compareTargetItem.subtitle}
+                    className="h-full min-h-[760px]"
+                  />
                 ) : (
-                  <div className="grid h-full min-h-[760px] grid-cols-[1fr_84px_1fr] gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="min-w-0 border-r border-slate-200 bg-white">
-                      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{compareBaseItem?.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">{compareBaseItem?.subtitle ?? "기준 버전"}</p>
-                        </div>
-                      </div>
-                      <div className="divide-y divide-slate-100 font-mono text-[13px]">
-                        {(compareTargetItem ? diffRows : baseRows).map((row, index) => {
-                          const leftLineNumber = compareTargetItem ? row.leftLineNumber : row.lineNumber
-                          const leftText = compareTargetItem ? row.leftText : row.text
-                          const leftType = compareTargetItem ? row.leftType : "same"
-
-                          return (
-                            <div key={`left-${index}`} className={`grid grid-cols-[56px_1fr] ${diffRowClass(leftType)}`}>
-                              <div className="border-r border-slate-200 px-3 py-2 text-right text-slate-400">
-                                {leftLineNumber ?? ""}
-                              </div>
-                              <pre className={`overflow-x-auto whitespace-pre-wrap border-l-4 px-4 py-2 ${leftType === "removed" ? "border-l-rose-400" : leftType === "changed" ? "border-l-sky-400" : "border-l-transparent"} ${diffTextClass(leftType)}`}>
-                                {leftText || " "}
-                              </pre>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="border-r border-slate-200 bg-slate-50 font-mono text-[12px] text-slate-500">
-                      <div className="sticky top-0 z-10 border-b border-slate-200 bg-slate-100 px-3 py-3 text-center text-[11px] font-semibold text-slate-500">
-                        위치
-                      </div>
-                      <div className="divide-y divide-slate-100">
-                        {compareTargetItem ? (
-                          diffRows.map((row, index) => {
-                            const status = row.rightType === "added" ? "+" : row.leftType === "removed" ? "-" : row.leftType === "changed" || row.rightType === "changed" ? "~" : ""
-                            const statusClass = row.rightType === "added"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : row.leftType === "removed"
-                                ? "bg-rose-100 text-rose-700"
-                                : row.leftType === "changed" || row.rightType === "changed"
-                                  ? "bg-sky-100 text-sky-700"
-                                  : "bg-transparent text-slate-400"
-                            return (
-                              <div key={`mid-${index}`} className="grid grid-cols-[1fr_28px_1fr] items-center gap-1 px-2 py-2 text-center">
-                                <span>{row.leftLineNumber ?? ""}</span>
-                                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${statusClass}`}>{status}</span>
-                                <span>{row.rightLineNumber ?? ""}</span>
-                              </div>
-                            )
-                          })
-                        ) : (
-                          baseRows.map((row) => (
-                            <div key={`mid-base-${row.lineNumber}`} className="grid grid-cols-[1fr_28px_1fr] items-center gap-1 px-2 py-2 text-center">
-                              <span>{row.lineNumber}</span>
-                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-slate-300">•</span>
-                              <span></span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="min-w-0 bg-white">
-                      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {compareTargetItem?.title ?? "비교할 버전 선택"}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {compareTargetItem
-                              ? compareTargetItem.subtitle
-                              : "왼쪽 그래프에서 다른 기록 또는 작업장의 비교 버튼을 누르세요."}
-                          </p>
-                        </div>
-                      </div>
-                      {compareTargetItem ? (
-                        <div className="divide-y divide-slate-100 font-mono text-[13px]">
-                          {diffRows.map((row, index) => (
-                            <div key={`right-${index}`} className={`grid grid-cols-[56px_1fr] ${diffRowClass(row.rightType)}`}>
-                              <div className="border-r border-slate-200 px-3 py-2 text-right text-slate-400">
-                                {row.rightLineNumber ?? ""}
-                              </div>
-                              <pre className={`overflow-x-auto whitespace-pre-wrap border-l-4 px-4 py-2 ${row.rightType === "added" ? "border-l-emerald-500" : row.rightType === "changed" ? "border-l-sky-400" : "border-l-transparent"} ${diffTextClass(row.rightType)}`}>
-                                {row.rightText || " "}
-                              </pre>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex h-[720px] items-center justify-center text-sm text-slate-500">
-                          비교할 기록 또는 작업장을 아직 선택하지 않았습니다.
-                        </div>
-                      )}
-                    </div>
+                  <div className="flex h-full min-h-[760px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm text-slate-500 shadow-sm">
+                    그래프에서 비교할 다른 기록이나 작업장을 선택하세요.
                   </div>
                 )}
               </div>

@@ -60,7 +60,9 @@ export default function DocumentsList() {
     if (recentType === "SAVE") {
       navigate(`/documents/${doc.id}?mode=save&saveId=${recentTypeId}`)
     } else if (recentType === "COMMIT") {
-      navigate(`/documents/${doc.id}?mode=commit&saveId=${recentTypeId}`)
+      navigate(`/documents/${doc.id}?mode=commit&commitId=${recentTypeId}`)
+    } else {
+      navigate(`/documents/${doc.id}`)
     }
   }
 

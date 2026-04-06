@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
-import { ChevronDown, GitCommit, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -179,26 +179,7 @@ export default function LandingConceptDemoPage() {
 
   return (
     <div className="bg-[#050505] text-white font-sans selection:bg-orange-500 selection:text-white overflow-x-hidden antialiased">
-      <nav className="fixed top-0 w-full z-50 px-10 py-8 flex justify-between items-center bg-[#050505]/60 backdrop-blur-md border-b border-white/5">
-        <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/')}>
-          <div className="w-10 h-10 bg-white text-black flex items-center justify-center font-black rounded-sm text-xl italic">D</div>
-          <span className="text-2xl font-black tracking-widest uppercase italic">Docsa</span>
-        </div>
-        <div className="flex gap-8 text-[10px] font-bold tracking-[0.3em] uppercase text-white/50">
-          <button className="hover:text-white transition-colors flex items-center gap-2" onClick={() => navigate('/demo/working-save-flow')}>
-            <GitCommit size={14} />
-            Node Mesh
-          </button>
-          <button
-            onClick={handleGetStarted}
-            className="px-6 py-2 bg-white text-black font-black rounded-full hover:bg-orange-500 hover:text-white transition-all"
-          >
-            Get Started
-          </button>
-        </div>
-      </nav>
-
-      <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 pt-20 z-20 overflow-hidden">
+      <section className="relative z-20 flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-20 text-center">
         <div className="relative w-full max-w-md mx-auto mb-16 h-[200px] flex flex-col items-center justify-center">
           <motion.div
             initial={{ opacity: 1 }}
@@ -241,28 +222,25 @@ export default function LandingConceptDemoPage() {
         </div>
 
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 5, duration: 1 }}>
-          <h1 className="text-5xl md:text-[7rem] font-black leading-[1] tracking-tighter uppercase italic mb-8">
+          <h1
+            className="mb-8 text-6xl font-black leading-[0.96] tracking-tight md:text-[7.75rem]"
+            style={{ fontFamily: '"SF Pro Display","SUIT Variable","Pretendard Variable","Apple SD Gothic Neo",sans-serif' }}
+          >
             버전 관리의 악몽, <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-pink-500 to-orange-600 drop-shadow-[0_10px_30px_rgba(249,115,22,0.4)]">
               이제 끝내다.
             </span>
           </h1>
-          <p className="max-w-2xl mx-auto text-gray-400 text-lg md:text-xl font-light leading-relaxed mb-16">
+          <p className="mx-auto mb-16 max-w-3xl text-xl font-light leading-relaxed text-gray-400 md:text-2xl">
             더 이상 파일 이름 뒤에 '(진짜최종)'을 붙이며 고통받지 마세요. <br />
             Docsa의 유기적인 시각화 엔진이 문서의 모든 흐름을 통제합니다.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <button
               onClick={handleGetStarted}
-              className="px-16 py-6 bg-white text-black font-black rounded-sm hover:bg-orange-500 hover:text-white transition-all shadow-[0_20px_50px_rgba(249,115,22,0.2)] tracking-[0.4em] uppercase text-xs group flex items-center gap-3"
+              className="group flex items-center gap-3 rounded-sm bg-white px-16 py-6 text-sm font-black text-black shadow-[0_20px_50px_rgba(249,115,22,0.2)] transition-all hover:bg-orange-500 hover:text-white md:px-20 md:py-7 md:text-base"
             >
-              Initialize Project <ArrowRight className="group-hover:translate-x-1 transition-transform" size={16} />
-            </button>
-            <button
-              onClick={() => navigate('/demo/working-save-flow')}
-              className="rounded-sm border border-white/15 bg-white/5 px-10 py-6 text-xs font-black uppercase tracking-[0.35em] text-white transition-all hover:border-orange-500 hover:text-orange-300"
-            >
-              Open Demo
+              시작하기 <ArrowRight className="transition-transform group-hover:translate-x-1" size={18} />
             </button>
           </div>
         </motion.div>
@@ -339,20 +317,23 @@ export default function LandingConceptDemoPage() {
 
       <section className="relative min-h-[80vh] flex flex-col items-center justify-center text-center px-6 border-t border-white/5">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(249,115,22,0.08)_0%,transparent_60%)]" />
-        <h2 className="text-6xl md:text-[9rem] font-black uppercase italic mb-12 leading-[0.85] tracking-tighter relative z-10">
-          Control <br />
-          <span className="text-orange-500 drop-shadow-[0_0_50px_rgba(234,88,12,0.4)]">Evolution.</span>
+        <h2
+          className="relative z-10 mb-12 text-7xl font-black leading-[0.88] tracking-tight md:text-[9rem]"
+          style={{ fontFamily: '"SF Pro Display","SUIT Variable","Pretendard Variable","Apple SD Gothic Neo",sans-serif' }}
+        >
+          From Draft <br />
+          <span className="text-orange-500 drop-shadow-[0_0_50px_rgba(234,88,12,0.4)]">to Decision.</span>
         </h2>
         <button
           onClick={handleGetStarted}
-          className="px-16 py-6 bg-white text-black font-black rounded-sm hover:bg-orange-500 hover:text-white transition-all shadow-[0_20px_50px_rgba(249,115,22,0.2)] tracking-[0.4em] uppercase text-xs relative z-10 group flex items-center gap-3"
+          className="relative z-10 group flex items-center gap-3 rounded-sm bg-white px-16 py-6 text-sm font-black text-black shadow-[0_20px_50px_rgba(249,115,22,0.2)] transition-all hover:bg-orange-500 hover:text-white md:px-20 md:py-7 md:text-base"
         >
-          Initialize Project <ArrowRight className="group-hover:translate-x-1 transition-transform" size={16} />
+          시작하기 <ArrowRight className="transition-transform group-hover:translate-x-1" size={18} />
         </button>
       </section>
 
-      <footer className="py-12 text-center flex flex-col items-center gap-4 opacity-40 bg-[#050505]">
-        <p className="text-[10px] font-mono tracking-[0.8em] uppercase">Docsa Protocol Concept © 2026</p>
+      <footer className="bg-[#050505] py-12 text-center text-sm text-white/35">
+        <p>Docsa, 문서 버전의 흐름을 정리합니다.</p>
       </footer>
     </div>
   );

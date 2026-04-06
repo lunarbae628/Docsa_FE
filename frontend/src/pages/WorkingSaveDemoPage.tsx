@@ -180,7 +180,7 @@ function buildGraphData(
   commits: CommitRecord[],
 ): GraphDataType {
   return {
-    title: "문서 작업장 데모",
+    title: "문서 작업 흐름",
     commits: commits.map((commit) => ({
       id: commit.id,
       branchId: commit.branchId,
@@ -782,16 +782,16 @@ export default function WorkingSaveDemoPage() {
 
   return (
     <>
-      <div className="h-screen w-screen overflow-hidden bg-slate-100">
+      <div className="h-full min-h-0 w-full overflow-hidden bg-slate-100">
         <ResizableLayout
           initialWidth={450}
           minWidth={340}
           maxWidth={860}
-          className="h-screen"
-          sidebarClassName="h-full"
-          mainClassName="h-full bg-slate-100"
+          className="h-full min-h-0"
+          sidebarClassName="h-full min-h-0"
+          mainClassName="h-full min-h-0 bg-slate-100"
         >
-          <div className="h-full bg-slate-100 p-3">
+          <div className="h-full min-h-0 bg-slate-100 p-3">
             <DocumentGraph
               data={graphData}
               mainBranch={mainBranch}
@@ -845,7 +845,7 @@ export default function WorkingSaveDemoPage() {
             />
           </div>
 
-          <div className="h-full bg-slate-100 p-3">
+          <div className="h-full min-h-0 bg-slate-100 p-3">
             <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
                 <div className="min-w-0">
@@ -1081,7 +1081,7 @@ export default function WorkingSaveDemoPage() {
             <AlertDialogDescription>
               {deleteDialog?.type === "commit"
                 ? "현재 보고 있는 기록만 삭제됩니다. 이전 기록과 작업장은 그대로 유지됩니다."
-                : "브랜치와 그 아래 기록들이 함께 제거됩니다. 이 데모에서는 작업장 삭제를 따로 만들지 않고 브랜치 정리의 일부로 처리합니다."}
+                : "브랜치와 그 아래 기록들이 함께 제거됩니다. 작업장은 별도 삭제 없이 브랜치 정리 흐름에 포함됩니다."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

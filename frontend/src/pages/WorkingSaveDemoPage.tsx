@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import type { OutputData } from "@editorjs/editorjs"
 import {
   GitCommitHorizontal,
   GitCompareArrows,
@@ -10,6 +11,7 @@ import {
 import ResizableLayout from "@/layouts/ResizableLayout"
 import DocumentGraph from "@/components/DocumentGraph"
 import DocumentEditor from "@/components/DocumentEditor"
+import DocumentMergeView from "@/components/DocumentMergeView"
 import BranchEditModal from "@/components/BranchEditModal"
 import SaveCommitModal from "@/components/SaveCommitModal"
 import { Button } from "@/components/ui/button"
@@ -69,6 +71,14 @@ type ViewState =
       compareKind: CompareItemKind | null
       compareId: number | null
     }
+  | {
+      mode: "merge"
+      branchId: number
+      sourceKind: CompareItemKind
+      sourceId: number
+      targetKind: CompareItemKind | null
+      targetId: number | null
+    }
 
 type SyncStatus = "idle" | "syncing" | "synced"
 
@@ -122,7 +132,8 @@ const initialCommits: CommitRecord[] = [
     branchId: 1,
     title: "Initial draft",
     description: "문서 구조 초안",
-    content: "프로젝트 소개\n\n- 목적 정리\n- 핵심 기능 정의",
+    content:
+      "프로젝트 소개\n이 문서는 팀이 문서 편집 흐름을 점검하기 위한 초기 초안이며, 실험적인 아이디어보다 기본 구조를 차분하게 정리하는 데 목적이 있습니다.\n\n현재 범위\n- 문서 저장 흐름을 먼저 확인하고, 기록 생성 시점은 나중에 세밀하게 조정합니다.\n- 협업 기능은 제외하고, 단일 사용자가 문서를 안정적으로 다루는 경험에 집중합니다.",
     createdAt: "2026-04-05T09:00:00+09:00",
     kind: "commit",
   },
@@ -131,7 +142,8 @@ const initialCommits: CommitRecord[] = [
     branchId: 1,
     title: "Main head",
     description: "Outbox 적용 반영",
-    content: "프로젝트 소개\n\n- Outbox 패턴 적용\n- 삭제 응답 성능 개선",
+    content:
+      "프로젝트 소개\n이 문서는 팀이 문서 편집 흐름을 점검하기 위한 메인 초안이며, 실험적인 아이디어보다 기본 구조를 안정적으로 정리하는 데 목적이 있습니다.\n\n현재 범위\n- 문서 저장 흐름에 Outbox 패턴을 우선 적용하고, 기록 생성 시점은 나중에 세밀하게 조정합니다.\n- 협업 기능은 제외하고, 단일 사용자가 문서를 안정적으로 다루는 경험에 집중합니다.",
     createdAt: "2026-04-05T09:30:00+09:00",
     kind: "commit",
   },
@@ -140,7 +152,8 @@ const initialCommits: CommitRecord[] = [
     branchId: 2,
     title: "Fork point work",
     description: "실험 브랜치 시작점",
-    content: "프로젝트 소개\n\n- 브랜치된 실험안\n- 미정리 메모",
+    content:
+      "프로젝트 소개\n이 문서는 팀이 문서 편집 흐름을 점검하기 위한 브랜치 초안이며, 실험적인 아이디어를 더 빠르게 정리하는 데 목적이 있습니다.\n\n현재 범위\n- 문서 저장 흐름을 먼저 확인하고, 기록 생성 시점은 조금 더 빠르게 드러나도록 구성합니다.\n- 협업 기능은 제외하고, 단일 사용자가 문서를 유연하게 다루는 경험에 집중합니다.",
     createdAt: "2026-04-05T10:00:00+09:00",
     kind: "commit",
   },
@@ -149,7 +162,8 @@ const initialCommits: CommitRecord[] = [
     branchId: 2,
     title: "Release copy head",
     description: "리뷰 전 working snapshot",
-    content: "프로젝트 소개\n\n- 브랜치 실험안 정리\n- 리뷰 전 상태",
+    content:
+      "프로젝트 소개\n이 문서는 팀이 문서 편집 흐름을 점검하기 위한 브랜치 초안이며, 실험적인 아이디어를 더 선명하게 정리하는 데 목적이 있습니다.\n\n현재 범위\n- 문서 저장 흐름을 먼저 확인하고, 기록 생성 시점은 조금 더 빠르게 드러나도록 구성합니다.\n- 협업 기능은 제외하고, 단일 사용자가 문서를 유연하게 다루는 경험에 집중합니다.",
     createdAt: "2026-04-05T10:30:00+09:00",
     kind: "commit",
   },
@@ -160,13 +174,13 @@ const initialWorkspaces: WorkspaceRecord[] = [
     id: 1,
     branchId: 1,
     content:
-      "프로젝트 소개\n\n- Outbox 패턴 적용\n- 삭제 응답 성능 개선\n- 현재 main branch에서 계속 수정 중",
+      "프로젝트 소개\n이 문서는 팀이 문서 편집 흐름을 점검하기 위한 메인 초안이며, 실험적인 아이디어보다 기본 구조를 안정적으로 정리하는 데 목적이 있습니다.\n\n현재 범위\n- 문서 저장 흐름에 Outbox 패턴을 우선 적용하고, 기록 생성 시점은 나중에 세밀하게 조정합니다.\n- 협업 기능은 제외하고, 단일 사용자가 문서를 안정적으로 다루는 경험에 집중합니다.\n- 현재 main branch에서 설명 문장을 조금 더 자연스럽게 다듬는 중입니다.",
   },
   {
     id: 2,
     branchId: 2,
     content:
-      "프로젝트 소개\n\n- 브랜치 실험안 정리\n- release-copy branch의 working copy",
+      "프로젝트 소개\n이 문서는 팀이 문서 편집 흐름을 점검하기 위한 브랜치 초안이며, 실험적인 아이디어를 더 선명하게 정리하는 데 목적이 있습니다.\n\n현재 범위\n- 문서 저장 흐름을 먼저 확인하고, 기록 생성 시점은 조금 더 빠르게 드러나도록 구성합니다.\n- 협업 기능은 제외하고, 단일 사용자가 문서를 유연하게 다루는 경험에 집중합니다.\n- 현재 release-copy branch에서 리뷰용 표현을 조금 더 또렷하게 다듬는 중입니다.",
   },
 ]
 
@@ -421,9 +435,73 @@ export default function WorkingSaveDemoPage() {
     }))
   }, [compareBaseItem])
 
-  const canDirectMerge = Boolean(
-    currentCommit && currentCommit.branchId !== mainBranch.id,
-  )
+  const mergeSourceItem = useMemo(() => {
+    if (view.mode !== "merge") return null
+
+    if (view.sourceKind === "commit") {
+      const commit = commits.find((item) => item.id === view.sourceId)
+      if (!commit) return null
+      const branch = branches.find((item) => item.id === commit.branchId)
+      return {
+        kind: "commit" as const,
+        id: commit.id,
+        branchId: commit.branchId,
+        title: commit.title,
+        subtitle: branch ? `${branch.name} 기록` : "기록",
+        content: commit.content,
+      }
+    }
+
+    const workspace = workspaces.find((item) => item.id === view.sourceId)
+    if (!workspace) return null
+    const branch = branches.find((item) => item.id === workspace.branchId)
+    return {
+      kind: "workspace" as const,
+      id: workspace.id,
+      branchId: workspace.branchId,
+      title: branch ? `${branch.name} 작업장` : "작업장",
+      subtitle: "현재 편집 상태",
+      content: workspace.content,
+    }
+  }, [branches, commits, view, workspaces])
+
+  const mergeTargetItem = useMemo(() => {
+    if (view.mode !== "merge" || !view.targetId || !view.targetKind) return null
+
+    if (view.targetKind === "commit") {
+      const commit = commits.find((item) => item.id === view.targetId)
+      if (!commit) return null
+      const branch = branches.find((item) => item.id === commit.branchId)
+      return {
+        kind: "commit" as const,
+        id: commit.id,
+        branchId: commit.branchId,
+        title: commit.title,
+        subtitle: branch ? `${branch.name} 기록` : "기록",
+        content: commit.content,
+      }
+    }
+
+    const workspace = workspaces.find((item) => item.id === view.targetId)
+    if (!workspace) return null
+    const branch = branches.find((item) => item.id === workspace.branchId)
+    return {
+      kind: "workspace" as const,
+      id: workspace.id,
+      branchId: workspace.branchId,
+      title: branch ? `${branch.name} 작업장` : "작업장",
+      subtitle: "현재 편집 상태",
+      content: workspace.content,
+    }
+  }, [branches, commits, view, workspaces])
+
+  const mergeSourceData = useMemo(() => {
+    return mergeSourceItem ? markdownToEditorData(mergeSourceItem.content) : null
+  }, [mergeSourceItem])
+
+  const mergeTargetData = useMemo(() => {
+    return mergeTargetItem ? markdownToEditorData(mergeTargetItem.content) : null
+  }, [mergeTargetItem])
 
   const currentBranchCommits = useMemo(() => {
     if (!currentBranch) return []
@@ -601,6 +679,33 @@ export default function WorkingSaveDemoPage() {
     setToast(`두 버전을 나란히 비교 중입니다.`)
   }
 
+  const handleMergeStart = (kind: CompareItemKind, id: number, branchId: number) => {
+    setView({
+      mode: "merge",
+      branchId,
+      sourceKind: kind,
+      sourceId: id,
+      targetKind: null,
+      targetId: null,
+    })
+    setToast("그래프에서 병합할 대상 브랜치의 기록이나 작업장을 고르세요.")
+  }
+
+  const handleMergeTargetPick = (kind: CompareItemKind, id: number) => {
+    if (view.mode !== "merge") return
+    if (kind === view.sourceKind && id === view.sourceId) return
+
+    setView({
+      mode: "merge",
+      branchId: view.branchId,
+      sourceKind: view.sourceKind,
+      sourceId: view.sourceId,
+      targetKind: kind,
+      targetId: id,
+    })
+    setToast("병합 결과를 확인한 뒤 적용할 수 있습니다.")
+  }
+
   const handleDeleteCurrentCommit = () => {
     if (!canDeleteCurrentCommit || !currentCommit || !currentBranch) return
 
@@ -668,32 +773,28 @@ export default function WorkingSaveDemoPage() {
     setDeleteDialog(null)
   }
 
-  const handleDirectMerge = (targetCommitId?: number) => {
-    if (!mainWorkspace) return
+  const handleDirectMerge = (mergedData: OutputData) => {
+    const sourceItem =
+      view.mode === "merge" ? mergeSourceItem : null
 
-    const mergeCommit = targetCommitId
-      ? commits.find((commit) => commit.id === targetCommitId) ?? null
-      : currentCommit
-    if (!mergeCommit) return
+    if (!sourceItem || !mergeTargetItem) return
 
-    const sourceBranch = branches.find((branch) => branch.id === mergeCommit.branchId)
-    if (!sourceBranch || sourceBranch.id === mainBranch.id) return
+    const targetBranch = branches.find((branch) => branch.id === mergeTargetItem.branchId)
+    const targetWorkspace = workspaces.find(
+      (workspace) => workspace.branchId === mergeTargetItem.branchId,
+    )
+    if (!targetBranch || !targetWorkspace) return
 
     const nextCommitId = getNextId(commits)
-    const mergedContent = [
-      mainWorkspace.content,
-      "",
-      `--- ${sourceBranch.name} 변경 반영 ---`,
-      mergeCommit.content,
-    ].join("\n")
+    const mergedContent = editorDataToMarkdown(mergedData)
 
     setCommits((prev) => [
       ...prev,
       {
         id: nextCommitId,
-        branchId: mainBranch.id,
-        title: `${sourceBranch.name} 병합`,
-        description: `main에 ${sourceBranch.name} 변경 반영`,
+        branchId: targetBranch.id,
+        title: `${sourceItem.title} 병합`,
+        description: `${targetBranch.name}에 ${sourceItem.title} 반영`,
         content: mergedContent,
         createdAt: new Date().toISOString(),
         kind: "merge",
@@ -702,7 +803,7 @@ export default function WorkingSaveDemoPage() {
 
     setBranches((prev) =>
       prev.map((branch) =>
-        branch.id === mainBranch.id
+        branch.id === targetBranch.id
           ? { ...branch, headCommitId: nextCommitId }
           : branch,
       ),
@@ -710,19 +811,19 @@ export default function WorkingSaveDemoPage() {
 
     setWorkspaces((prev) =>
       prev.map((workspace) =>
-        workspace.id === mainWorkspace.id
+        workspace.id === targetWorkspace.id
           ? { ...workspace, content: mergedContent }
           : workspace,
       ),
     )
 
     setView({
-      mode: "workspace",
-      branchId: mainBranch.id,
-      workspaceId: mainWorkspace.id,
+      mode: "commit",
+      branchId: targetBranch.id,
+      commitId: nextCommitId,
     })
     setSyncStatus("synced")
-    setToast(`main 작업장에 ${sourceBranch.name} 내용을 병합했습니다.`)
+    setToast(`${targetBranch.name}에 ${sourceItem.title} 내용을 병합했습니다.`)
   }
 
   const handleGraphNodeMenuClick = (
@@ -749,8 +850,12 @@ export default function WorkingSaveDemoPage() {
         setDeleteDialog({ type: "commit", commitId: targetId })
         return
       case "commit-merge":
-        handleDirectMerge(targetId)
+      {
+        const commit = commits.find((item) => item.id === targetId)
+        if (!commit) return
+        handleMergeStart("commit", commit.id, commit.branchId)
         return
+      }
       case "temp-edit": {
         const branch = branches.find((item) => item.saveId === targetId)
         if (!branch) return
@@ -778,6 +883,8 @@ export default function WorkingSaveDemoPage() {
       ? `${currentBranch?.name ?? "branch"} 작업장`
       : view.mode === "compare"
         ? "기록 비교"
+        : view.mode === "merge"
+          ? "기록 병합"
         : `${currentBranch?.name ?? "branch"} 기록`
 
   return (
@@ -801,10 +908,16 @@ export default function WorkingSaveDemoPage() {
                   ? String(view.commitId)
                   : view.mode === "compare" && view.baseKind === "commit"
                     ? String(view.baseId)
+                    : view.mode === "merge" && view.sourceKind === "commit"
+                      ? String(view.sourceId)
                     : null
               }
               currentSaveId={
-                view.mode === "workspace" ? String(view.workspaceId) : null
+                view.mode === "workspace"
+                  ? String(view.workspaceId)
+                  : view.mode === "merge" && view.sourceKind === "workspace"
+                    ? String(view.sourceId)
+                    : null
               }
               onNodeMenuClick={handleGraphNodeMenuClick}
               onBranchSelect={(branchId) => {
@@ -825,7 +938,17 @@ export default function WorkingSaveDemoPage() {
                     }
                   : null
               }
+              mergeSelection={
+                view.mode === "merge"
+                  ? {
+                      active: true,
+                      sourceKind: view.sourceKind,
+                      sourceId: view.sourceId,
+                    }
+                  : null
+              }
               onCompareTargetPick={handleCompareTargetPick}
+              onMergeTargetPick={handleMergeTargetPick}
             />
           </div>
 
@@ -844,6 +967,13 @@ export default function WorkingSaveDemoPage() {
                   {view.mode === "compare" && compareBaseItem ? (
                     <p className="truncate text-xs text-slate-500">
                       {compareBaseItem.title} 기준 비교
+                    </p>
+                  ) : null}
+                  {view.mode === "merge" && mergeSourceItem ? (
+                    <p className="truncate text-xs text-slate-500">
+                      {mergeTargetItem
+                        ? `${mergeSourceItem.title} -> ${mergeTargetItem.title}`
+                        : `${mergeSourceItem.title} 기준 병합`}
                     </p>
                   ) : null}
                   {view.mode === "workspace" ? (
@@ -870,11 +1000,15 @@ export default function WorkingSaveDemoPage() {
                   ) : null}
                   {view.mode === "commit" && currentCommit ? (
                     <>
-                      {canDirectMerge ? (
-                        <Button size="sm" onClick={handleDirectMerge}>
-                          <GitMerge className="h-4 w-4" /> 병합하기
-                        </Button>
-                      ) : null}
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          currentCommit &&
+                          handleMergeStart("commit", currentCommit.id, currentCommit.branchId)
+                        }
+                      >
+                        <GitMerge className="h-4 w-4" /> 병합하기
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -922,6 +1056,21 @@ export default function WorkingSaveDemoPage() {
                       <X className="h-4 w-4" /> 비교 종료
                     </Button>
                   ) : null}
+                  {view.mode === "merge" && mergeSourceItem ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setView({
+                          mode: "commit",
+                          branchId: mergeSourceItem.branchId,
+                          commitId: mergeSourceItem.id,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" /> 병합 종료
+                    </Button>
+                  ) : null}
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
                     {syncStatus === "syncing"
                       ? "자동 반영 중"
@@ -967,6 +1116,33 @@ export default function WorkingSaveDemoPage() {
                       contentLayout="document"
                     />
                   </div>
+                ) : view.mode === "merge" ? (
+                  mergeSourceData && mergeTargetData ? (
+                    <div className="h-full min-h-[760px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <DocumentMergeView
+                        baseData={mergeSourceData}
+                        targetData={mergeTargetData}
+                        initialMergedData={mergeTargetData}
+                        baseLabel={mergeSourceItem?.title ?? "병합 원본"}
+                        targetLabel={mergeTargetItem?.title ?? "병합 대상"}
+                        title="기록 병합"
+                        className="h-full"
+                        onCancel={() =>
+                          mergeSourceItem &&
+                          setView({
+                            mode: "commit",
+                            branchId: mergeSourceItem.branchId,
+                            commitId: mergeSourceItem.id,
+                          })
+                        }
+                        onSave={handleDirectMerge}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-full min-h-[760px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm text-slate-500 shadow-sm">
+                      병합할 대상 기록 또는 작업장을 먼저 선택하세요.
+                    </div>
+                  )
                 ) : (
                   <div className="grid h-full min-h-[760px] grid-cols-[1fr_84px_1fr] gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="min-w-0 border-r border-slate-200 bg-white">
@@ -1115,6 +1291,7 @@ export default function WorkingSaveDemoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </>
   )
 }

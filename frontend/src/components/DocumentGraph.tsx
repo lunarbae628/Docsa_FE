@@ -21,6 +21,12 @@ type CompareSelectionState = {
   baseId: number
 }
 
+type MergeSelectionState = {
+  active: boolean
+  sourceKind: "commit" | "workspace"
+  sourceId: number
+}
+
 export interface DocumentGraphProps {
   data: GraphDataType
   currentCommitId: string | null
@@ -36,7 +42,9 @@ export interface DocumentGraphProps {
   onBranchDelete?: (branchId: number) => void
   onBranchRename?: (branchId: number, newName: string) => void | Promise<void>
   compareSelection?: CompareSelectionState | null
+  mergeSelection?: MergeSelectionState | null
   onCompareTargetPick?: (kind: "commit" | "workspace", id: number) => void
+  onMergeTargetPick?: (kind: "commit" | "workspace", id: number) => void
 }
 
 const edgeTypes = {
@@ -127,7 +135,9 @@ export default function DocumentGraph({
   onBranchDelete,
   onBranchRename,
   compareSelection,
+  mergeSelection,
   onCompareTargetPick,
+  onMergeTargetPick,
 }: DocumentGraphProps) {
   const flowKey = `${data.branches.length}-${data.commits.length}-${data.edges.length}`
   const activeCommitId =
@@ -186,6 +196,15 @@ export default function DocumentGraph({
 
     if (node?.data?.nodeType === "commit" && node.data.commit) {
       if (
+        mergeSelection?.active &&
+        onMergeTargetPick &&
+        !(mergeSelection.sourceKind === "commit" && mergeSelection.sourceId === node.data.commit.id)
+      ) {
+        onMergeTargetPick("commit", node.data.commit.id)
+        return
+      }
+
+      if (
         compareSelection?.active &&
         onCompareTargetPick &&
         !(compareSelection.baseKind === "commit" && compareSelection.baseId === node.data.commit.id)
@@ -203,6 +222,15 @@ export default function DocumentGraph({
     }
 
     if (node?.data?.nodeType === "temp" && node.data.saveId) {
+      if (
+        mergeSelection?.active &&
+        onMergeTargetPick &&
+        !(mergeSelection.sourceKind === "workspace" && mergeSelection.sourceId === node.data.saveId)
+      ) {
+        onMergeTargetPick("workspace", node.data.saveId)
+        return
+      }
+
       if (
         compareSelection?.active &&
         onCompareTargetPick &&
@@ -225,7 +253,9 @@ export default function DocumentGraph({
               작업 흐름
             </div>
             <div className="mt-1 text-xs text-slate-500">
-              {compareSelection?.active
+              {mergeSelection?.active
+                ? "병합할 대상을 그래프에서 선택하세요."
+                : compareSelection?.active
                 ? "비교할 대상을 그래프에서 선택하세요."
                 : "브랜치와 편집중 상태를 세로 그래프로 확인합니다."}
             </div>

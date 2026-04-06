@@ -1,98 +1,547 @@
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { OutputData } from "@editorjs/editorjs"
+import { diff_match_patch } from "diff-match-patch"
+import { Check, ChevronsLeft, ChevronsRight, GitMerge, X } from "lucide-react"
 import DocumentEditor, { type DocumentEditorRef } from "./DocumentEditor"
 import { Button } from "./ui/button"
-import {
-  ChevronRight,
-  ChevronLeft,
-  ChevronsRight,
-  ChevronsLeft,
-  GitMerge,
-  X,
-  Check,
-  AlertCircle,
-  Copy,
-  Eye,
-  EyeOff,
-} from "lucide-react"
 import { cn } from "@/lib/utils"
-import {
-  calculateBlockDiff,
-  type BlockDiff,
-  type EditorBlock,
-  blockToText,
-} from "@/lib/diffUtils"
+import type { EditorBlock } from "@/lib/diffUtils"
 
 interface DocumentMergeViewProps {
   baseData: OutputData
   targetData: OutputData
   onSave: (mergedData: OutputData) => void
   onCancel: () => void
+  title?: string
+  baseLabel?: string
+  targetLabel?: string
+  initialMergedData?: OutputData
+  className?: string
 }
 
-// 블록 미리보기 컴포넌트
-function BlockPreview({
-  block,
-  side,
-  isHighlighted,
-  onApply,
-}: {
-  block: EditorBlock
-  side: "base" | "target"
-  isHighlighted: boolean
-  onApply: () => void
-}) {
-  const getBlockIcon = (type: string) => {
-    switch (type) {
-      case "paragraph":
-        return "¶"
-      case "header":
-        return `H${(block.data.level as number) || 1}`
-      case "list":
-        return block.data.style === "ordered" ? "1." : "•"
-      case "quote":
-        return "❝"
-      case "code":
-        return "</>"
-      case "delimiter":
-        return "---"
-      case "image":
-        return "🖼️"
-      default:
-        return "?"
+type MergeRowStatus = "same" | "modified" | "deleted" | "added"
+type MergeDecision = "left" | "right" | null
+
+type MergeRow = {
+  key: string
+  leftBlock?: EditorBlock
+  rightBlock?: EditorBlock
+  leftIndex: number | null
+  rightIndex: number | null
+  status: MergeRowStatus
+}
+
+type DiffSegment =
+  | { type: "equal"; text: string }
+  | { type: "changed"; leftText: string; rightText: string; regionIndex: number }
+
+function cloneData<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function createOutputData(blocks: OutputData["blocks"]): OutputData {
+  return {
+    time: Date.now(),
+    version: "2.30.8",
+    blocks,
+  }
+}
+
+function getVisibleBlockText(block: EditorBlock | undefined): string {
+  if (!block?.data) return ""
+
+  switch (block.type) {
+    case "paragraph":
+    case "header":
+    case "quote":
+      return String(block.data.text ?? "").replace(/<br\s*\/?>/gi, "\n")
+    case "code":
+      return String(block.data.code ?? "")
+    case "list": {
+      const items = Array.isArray(block.data.items) ? block.data.items : []
+      const ordered = block.data.style === "ordered"
+
+      return items
+        .map((item, index) => {
+          const text =
+            typeof item === "string"
+              ? item
+              : String(item?.content ?? item?.text ?? item?.value ?? "")
+          return ordered ? `${index + 1}. ${text}` : `• ${text}`
+        })
+        .join("\n")
+    }
+    default:
+      return String(block?.data?.text ?? JSON.stringify(block.data))
+  }
+}
+
+function blockBodyClass(block: EditorBlock | undefined) {
+  switch (block?.type) {
+    case "header":
+      return "text-[1.55rem] font-semibold leading-10 text-slate-900"
+    case "quote":
+      return "border-l-4 border-slate-200 pl-4 text-[15px] italic leading-7 text-slate-600"
+    case "code":
+      return "rounded-lg bg-slate-900/95 px-4 py-3 font-mono text-[13px] leading-6 text-slate-100"
+    default:
+      return "text-[15px] leading-8 text-slate-700"
+  }
+}
+
+function normalizeText(text: string) {
+  return text.replace(/\s+/g, " ").trim().toLowerCase()
+}
+
+function tokenize(text: string) {
+  return normalizeText(text)
+    .split(/[\s,.;:!?()[\]{}"'`~<>/\\|+-]+/)
+    .filter(Boolean)
+}
+
+function scoreTextSimilarity(a: string, b: string) {
+  const left = normalizeText(a)
+  const right = normalizeText(b)
+
+  if (!left && !right) return 1
+  if (!left || !right) return 0
+  if (left === right) return 1
+
+  const leftTokens = new Set(tokenize(left))
+  const rightTokens = new Set(tokenize(right))
+  const union = new Set([...leftTokens, ...rightTokens])
+  let intersection = 0
+
+  leftTokens.forEach((token) => {
+    if (rightTokens.has(token)) {
+      intersection += 1
+    }
+  })
+
+  const tokenScore = union.size > 0 ? intersection / union.size : 0
+  const prefixScore = left.startsWith(right) || right.startsWith(left) ? 0.15 : 0
+  const lengthScore =
+    1 - Math.min(Math.abs(left.length - right.length), Math.max(left.length, right.length)) /
+      Math.max(left.length, right.length)
+
+  return Math.max(tokenScore + prefixScore, lengthScore * 0.35)
+}
+
+function pairScore(leftBlock: EditorBlock, rightBlock: EditorBlock) {
+  const leftText = getVisibleBlockText(leftBlock)
+  const rightText = getVisibleBlockText(rightBlock)
+  const similarity = scoreTextSimilarity(leftText, rightText)
+
+  if (leftBlock.type === rightBlock.type && similarity === 1) {
+    return 4
+  }
+
+  if (leftBlock.type === rightBlock.type && similarity >= 0.18) {
+    return 1.5 + similarity
+  }
+
+  if (similarity >= 0.65) {
+    return 0.8 + similarity * 0.5
+  }
+
+  return Number.NEGATIVE_INFINITY
+}
+
+function buildMergeRows(baseData: OutputData, targetData: OutputData): MergeRow[] {
+  const leftBlocks = (baseData.blocks as EditorBlock[]) ?? []
+  const rightBlocks = (targetData.blocks as EditorBlock[]) ?? []
+  const gapPenalty = -0.8
+  const dp = Array.from({ length: leftBlocks.length + 1 }, () =>
+    Array(rightBlocks.length + 1).fill(0),
+  )
+
+  for (let i = leftBlocks.length - 1; i >= 0; i -= 1) {
+    dp[i][rightBlocks.length] = dp[i + 1][rightBlocks.length] + gapPenalty
+  }
+
+  for (let j = rightBlocks.length - 1; j >= 0; j -= 1) {
+    dp[leftBlocks.length][j] = dp[leftBlocks.length][j + 1] + gapPenalty
+  }
+
+  for (let i = leftBlocks.length - 1; i >= 0; i -= 1) {
+    for (let j = rightBlocks.length - 1; j >= 0; j -= 1) {
+      const match = pairScore(leftBlocks[i], rightBlocks[j]) + dp[i + 1][j + 1]
+      const deleteLeft = gapPenalty + dp[i + 1][j]
+      const insertRight = gapPenalty + dp[i][j + 1]
+      dp[i][j] = Math.max(match, deleteLeft, insertRight)
     }
   }
 
-  return (
-    <div
-      className={cn(
-        "relative p-3 mb-2 rounded border transition-all",
-        isHighlighted ? "border-blue-400 bg-blue-50" : "border-gray-200",
-        "group hover:border-gray-300",
-      )}
-    >
-      <div className="flex items-start gap-2">
-        <span className="text-xs text-gray-500 font-mono w-8 flex-shrink-0">
-          {getBlockIcon(block.type)}
-        </span>
-        <div className="flex-1">
-          <div className="text-xs text-gray-500 mb-1">{block.type}</div>
-          <div className="whitespace-pre-wrap text-sm">
-            {blockToText(block)}
-          </div>
+  const rows: MergeRow[] = []
+  let i = 0
+  let j = 0
+
+  while (i < leftBlocks.length || j < rightBlocks.length) {
+    const leftBlock = leftBlocks[i]
+    const rightBlock = rightBlocks[j]
+    const match =
+      leftBlock && rightBlock
+        ? pairScore(leftBlock, rightBlock) + dp[i + 1][j + 1]
+        : Number.NEGATIVE_INFINITY
+    const deleteLeft = leftBlock ? gapPenalty + dp[i + 1][j] : Number.NEGATIVE_INFINITY
+    const insertRight = rightBlock ? gapPenalty + dp[i][j + 1] : Number.NEGATIVE_INFINITY
+
+    if (
+      leftBlock &&
+      rightBlock &&
+      Number.isFinite(match) &&
+      match >= deleteLeft &&
+      match >= insertRight
+    ) {
+      const leftText = getVisibleBlockText(leftBlock)
+      const rightText = getVisibleBlockText(rightBlock)
+
+      rows.push({
+        key: `pair-${i}-${j}`,
+        leftBlock,
+        rightBlock,
+        leftIndex: i,
+        rightIndex: j,
+        status:
+          leftBlock.type === rightBlock.type && leftText === rightText
+            ? "same"
+            : "modified",
+      })
+      i += 1
+      j += 1
+      continue
+    }
+
+    if (leftBlock && (!rightBlock || deleteLeft >= insertRight)) {
+      rows.push({
+        key: `left-${i}`,
+        leftBlock,
+        leftIndex: i,
+        rightIndex: null,
+        status: "deleted",
+      })
+      i += 1
+      continue
+    }
+
+    if (rightBlock) {
+      rows.push({
+        key: `right-${j}`,
+        rightBlock,
+        leftIndex: null,
+        rightIndex: j,
+        status: "added",
+      })
+      j += 1
+    }
+  }
+
+  return rows
+}
+
+function buildDiffSegments(leftText: string, rightText: string): DiffSegment[] {
+  const dmp = new diff_match_patch()
+  const diffs = dmp.diff_main(leftText, rightText)
+  dmp.diff_cleanupSemantic(diffs)
+
+  const segments: DiffSegment[] = []
+  let pendingLeft = ""
+  let pendingRight = ""
+  let regionIndex = 0
+
+  const flushChanged = () => {
+    if (!pendingLeft && !pendingRight) return
+
+    segments.push({
+      type: "changed",
+      leftText: pendingLeft,
+      rightText: pendingRight,
+      regionIndex,
+    })
+    pendingLeft = ""
+    pendingRight = ""
+    regionIndex += 1
+  }
+
+  diffs.forEach(([op, text]) => {
+    if (op === 0) {
+      flushChanged()
+      segments.push({ type: "equal", text })
+    } else if (op === -1) {
+      pendingLeft += text
+    } else {
+      pendingRight += text
+    }
+  })
+
+  flushChanged()
+  return segments
+}
+
+function isEditableTextBlock(block?: EditorBlock) {
+  return Boolean(block && ["paragraph", "header", "quote", "code", "list"].includes(block.type))
+}
+
+function setBlockText(block: EditorBlock, text: string): EditorBlock {
+  const nextBlock = cloneData(block)
+
+  switch (nextBlock.type) {
+    case "paragraph":
+    case "header":
+    case "quote":
+      nextBlock.data.text = text.replace(/\n/g, "<br>")
+      return nextBlock
+    case "code":
+      nextBlock.data.code = text
+      return nextBlock
+    case "list": {
+      const lines = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+      const ordered = lines.every((line) => /^\d+\.\s+/.test(line))
+      nextBlock.data.style = ordered ? "ordered" : "unordered"
+      nextBlock.data.items = lines.map((line) =>
+        line.replace(/^(\d+\.|[-*•])\s+/, ""),
+      )
+      return nextBlock
+    }
+    default:
+      return nextBlock
+  }
+}
+
+function findClosestBlockIndex(currentBlocks: EditorBlock[], row: MergeRow) {
+  const expectedIndex = row.rightIndex ?? row.leftIndex ?? currentBlocks.length
+  const rightText = getVisibleBlockText(row.rightBlock)
+  const leftText = getVisibleBlockText(row.leftBlock)
+
+  let bestScore = Number.NEGATIVE_INFINITY
+  let bestIndex = -1
+
+  currentBlocks.forEach((block, index) => {
+    const currentText = getVisibleBlockText(block)
+    const similarity = Math.max(
+      scoreTextSimilarity(currentText, rightText),
+      scoreTextSimilarity(currentText, leftText) * 0.92,
+    )
+    const distancePenalty = Math.abs(index - expectedIndex) * 0.05
+    const score = similarity - distancePenalty
+
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = index
+    }
+  })
+
+  return bestScore > 0.08 ? bestIndex : -1
+}
+
+function computeInsertIndex(currentBlocks: EditorBlock[], row: MergeRow) {
+  const hint = row.rightIndex ?? row.leftIndex ?? currentBlocks.length
+  return Math.max(0, Math.min(hint, currentBlocks.length))
+}
+
+function applyRegionText(
+  currentText: string,
+  leftText: string,
+  rightText: string,
+  regionIndex: number,
+  side: "left" | "right",
+) {
+  const segments = buildDiffSegments(leftText, rightText)
+  const segment = segments.find(
+    (candidate) => candidate.type === "changed" && candidate.regionIndex === regionIndex,
+  )
+
+  if (!segment || segment.type !== "changed") {
+    return currentText
+  }
+
+  const segmentIndex = segments.indexOf(segment)
+  const prevContext =
+    segmentIndex > 0 && segments[segmentIndex - 1]?.type === "equal"
+      ? segments[segmentIndex - 1].text.slice(-20)
+      : ""
+  const nextContext =
+    segmentIndex < segments.length - 1 && segments[segmentIndex + 1]?.type === "equal"
+      ? segments[segmentIndex + 1].text.slice(0, 20)
+      : ""
+
+  const fromText = side === "left" ? segment.rightText : segment.leftText
+  const toText = side === "left" ? segment.leftText : segment.rightText
+
+  if (fromText && currentText.includes(fromText)) {
+    return currentText.replace(fromText, toText)
+  }
+
+  if (!fromText && toText) {
+    if (prevContext && currentText.includes(prevContext)) {
+      const pivot = currentText.indexOf(prevContext) + prevContext.length
+      return `${currentText.slice(0, pivot)}${toText}${currentText.slice(pivot)}`
+    }
+
+    if (nextContext && currentText.includes(nextContext)) {
+      const pivot = currentText.indexOf(nextContext)
+      return `${currentText.slice(0, pivot)}${toText}${currentText.slice(pivot)}`
+    }
+
+    return `${currentText}${toText}`
+  }
+
+  if (fromText && !toText) {
+    return currentText.replace(fromText, "")
+  }
+
+  const dmp = new diff_match_patch()
+  const [patched, applied] = dmp.patch_apply(
+    dmp.patch_make(`${prevContext}${fromText}${nextContext}`, `${prevContext}${toText}${nextContext}`),
+    currentText,
+  )
+
+  return applied.some(Boolean) ? (patched as string) : currentText
+}
+
+function decisionKey(row: MergeRow, regionIndex: number | null) {
+  return `${row.key}:${regionIndex ?? "block"}`
+}
+
+function PaneBlock({
+  row,
+  side,
+  decisions,
+  onSelectWhole,
+  onSelectRegion,
+}: {
+  row: MergeRow
+  side: "left" | "right"
+  decisions: Record<string, MergeDecision>
+  onSelectWhole: (row: MergeRow, side: "left" | "right") => void
+  onSelectRegion: (row: MergeRow, side: "left" | "right", regionIndex: number) => void
+}) {
+  const block = side === "left" ? row.leftBlock : row.rightBlock
+  const compareBlock = side === "left" ? row.rightBlock : row.leftBlock
+
+  if (!block) {
+    return <div className="h-6" />
+  }
+
+  const blockText = getVisibleBlockText(block)
+  const compareText = getVisibleBlockText(compareBlock)
+  const wholeDecision = decisions[decisionKey(row, null)] ?? null
+  const isWholeSelected = wholeDecision === side
+
+  if (row.status === "same") {
+    return (
+      <div className={cn("whitespace-pre-wrap break-words font-sans", blockBodyClass(block))}>
+        {blockText}
+      </div>
+    )
+  }
+
+  if (!compareBlock) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelectWhole(row, side)}
+        className={cn(
+          "w-full rounded-xl px-3 py-2 text-left transition",
+          side === "left"
+            ? isWholeSelected
+              ? "bg-rose-200/90"
+              : "bg-rose-100/80 hover:bg-rose-150"
+            : isWholeSelected
+              ? "bg-emerald-200/90"
+              : "bg-emerald-100/80 hover:bg-emerald-150",
+        )}
+      >
+        <div className={cn("whitespace-pre-wrap break-words font-sans", blockBodyClass(block))}>
+          {blockText}
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={onApply}
-        >
-          {side === "base" ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </Button>
+      </button>
+    )
+  }
+
+  const segments = buildDiffSegments(
+    side === "left" ? blockText : compareText,
+    side === "left" ? compareText : blockText,
+  )
+
+  return (
+    <div className={cn("whitespace-pre-wrap break-words font-sans", blockBodyClass(block))}>
+      {segments.map((segment, index) => {
+        if (segment.type === "equal") {
+          return <span key={`equal-${index}`}>{segment.text}</span>
+        }
+
+        const visibleText = side === "left" ? segment.leftText : segment.rightText
+        if (!visibleText) {
+          return null
+        }
+
+        const selected = decisions[decisionKey(row, segment.regionIndex)] === side
+
+        return (
+          <button
+            key={`changed-${segment.regionIndex}`}
+            type="button"
+            onClick={() => onSelectRegion(row, side, segment.regionIndex)}
+            className={cn(
+              "inline rounded px-0.5 transition",
+              side === "left"
+                ? selected
+                  ? "bg-rose-300 text-rose-900"
+                  : "bg-rose-100/95 text-rose-700 hover:bg-rose-200"
+                : selected
+                  ? "bg-emerald-300 text-emerald-900"
+                  : "bg-emerald-100/95 text-emerald-700 hover:bg-emerald-200",
+            )}
+          >
+            {visibleText}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function PreviewPane({
+  label,
+  subtitle,
+  side,
+  rows,
+  decisions,
+  onSelectWhole,
+  onSelectRegion,
+}: {
+  label: string
+  subtitle: string
+  side: "left" | "right"
+  rows: MergeRow[]
+  decisions: Record<string, MergeDecision>
+  onSelectWhole: (row: MergeRow, side: "left" | "right") => void
+  onSelectRegion: (row: MergeRow, side: "left" | "right", regionIndex: number) => void
+}) {
+  return (
+    <div className="flex min-h-0 flex-col bg-white">
+      <div className="border-b border-slate-200 px-5 py-4">
+        <div className="text-sm font-semibold text-slate-900">{label}</div>
+        <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-6">
+        <div className="mx-auto max-w-[860px]">
+          {rows.map((row) => (
+            <div key={`${side}-${row.key}`} className="border-b border-slate-100 py-4 last:border-b-0">
+              <PaneBlock
+                row={row}
+                side={side}
+                decisions={decisions}
+                onSelectWhole={onSelectWhole}
+                onSelectRegion={onSelectRegion}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -103,386 +552,283 @@ export default function DocumentMergeView({
   targetData,
   onSave,
   onCancel,
+  title = "기록 병합",
+  baseLabel = "병합 원본",
+  targetLabel = "병합 대상",
+  initialMergedData,
+  className,
 }: DocumentMergeViewProps) {
-  // 초기 머지 데이터는 base 데이터로 설정
-  const [mergedData, setMergedData] = useState<OutputData>(baseData)
-  const [selectedConflictIndex, setSelectedConflictIndex] = useState<number>(-1)
-  const [highlightedBlocks, setHighlightedBlocks] = useState<Set<string>>(
-    new Set(),
+  const editorRef = useRef<DocumentEditorRef>(null)
+  const baselineData = useMemo(
+    () => cloneData(initialMergedData ?? targetData),
+    [initialMergedData, targetData],
   )
-  const [showBlockDetails, setShowBlockDetails] = useState(true)
-  const mergedEditorRef = useRef<DocumentEditorRef>(null)
+  const [mergedData, setMergedData] = useState<OutputData>(cloneData(baselineData))
+  const [decisions, setDecisions] = useState<Record<string, MergeDecision>>({})
 
-  // base와 target 간의 차이점 계산
-  const conflicts = useMemo(() => {
-    const diffs = calculateBlockDiff(baseData, targetData)
-    return diffs.filter((diff) => diff.type !== "unchanged")
-  }, [baseData, targetData])
+  useEffect(() => {
+    setMergedData(cloneData(baselineData))
+    setDecisions({})
+  }, [baselineData])
 
-  // 현재 선택된 충돌
-  const currentConflict = conflicts[selectedConflictIndex] || null
+  const rows = useMemo(() => buildMergeRows(baseData, targetData), [baseData, targetData])
 
-  // 블록을 머지 데이터에 적용하는 개선된 함수
-  const applyBlockFromSide = (blockId: string, side: "base" | "target") => {
-    console.log("Applying block:", blockId, "from", side)
+  const applyWholeDocument = async (side: "left" | "right") => {
+    const nextData = cloneData(side === "left" ? baseData : targetData)
+    setMergedData(nextData)
+    await editorRef.current?.updateData(nextData)
+  }
 
-    const sourceData = side === "base" ? baseData : targetData
-    const blockToApply = sourceData.blocks.find((b) => b.id === blockId)
+  const applyWholeRow = async (row: MergeRow, side: "left" | "right") => {
+    const sourceBlock = side === "left" ? row.leftBlock : row.rightBlock
+    const currentData = (await editorRef.current?.saveData()) ?? mergedData
+    const currentBlocks = cloneData((currentData.blocks as EditorBlock[]) ?? [])
+    const matchIndex = findClosestBlockIndex(currentBlocks, row)
 
-    if (!blockToApply) {
-      console.error("Block not found:", blockId)
+    if (sourceBlock) {
+      if (matchIndex >= 0) {
+        currentBlocks[matchIndex] = cloneData(sourceBlock)
+      } else {
+        currentBlocks.splice(computeInsertIndex(currentBlocks, row), 0, cloneData(sourceBlock))
+      }
+    } else if (matchIndex >= 0) {
+      currentBlocks.splice(matchIndex, 1)
+    }
+
+    const nextData = createOutputData(currentBlocks)
+    setMergedData(nextData)
+    await editorRef.current?.updateData(nextData)
+  }
+
+  const restoreWholeRow = async (row: MergeRow) => {
+    const baselineBlocks = cloneData((baselineData.blocks as EditorBlock[]) ?? [])
+    const currentData = (await editorRef.current?.saveData()) ?? mergedData
+    const currentBlocks = cloneData((currentData.blocks as EditorBlock[]) ?? [])
+    const matchIndex = findClosestBlockIndex(currentBlocks, row)
+    const baselineBlock =
+      row.rightIndex !== null ? baselineBlocks[row.rightIndex] : undefined
+
+    if (baselineBlock) {
+      if (matchIndex >= 0) {
+        currentBlocks[matchIndex] = cloneData(baselineBlock)
+      } else {
+        currentBlocks.splice(computeInsertIndex(currentBlocks, row), 0, cloneData(baselineBlock))
+      }
+    } else if (matchIndex >= 0) {
+      currentBlocks.splice(matchIndex, 1)
+    }
+
+    const nextData = createOutputData(currentBlocks)
+    setMergedData(nextData)
+    await editorRef.current?.updateData(nextData)
+  }
+
+  const applyRegion = async (row: MergeRow, side: "left" | "right", regionIndex: number) => {
+    if (!row.leftBlock || !row.rightBlock) {
+      await applyWholeRow(row, side)
       return
     }
 
-    // 블록의 인덱스를 찾기
-    const sourceIndex = sourceData.blocks.findIndex((b) => b.id === blockId)
+    const currentData = (await editorRef.current?.saveData()) ?? mergedData
+    const currentBlocks = cloneData((currentData.blocks as EditorBlock[]) ?? [])
+    const matchIndex = findClosestBlockIndex(currentBlocks, row)
 
-    // 새로운 블록 배열 생성
-    const newBlocks = [...mergedData.blocks]
+    if (matchIndex < 0) {
+      await applyWholeRow(row, side)
+      return
+    }
 
-    // 같은 ID의 블록이 이미 있는지 확인
-    const existingIndex = newBlocks.findIndex((b) => b.id === blockId)
+    const currentBlock = currentBlocks[matchIndex]
+    if (
+      !isEditableTextBlock(currentBlock) ||
+      !isEditableTextBlock(row.leftBlock) ||
+      !isEditableTextBlock(row.rightBlock)
+    ) {
+      await applyWholeRow(row, side)
+      return
+    }
 
-    if (existingIndex !== -1) {
-      // 이미 존재하면 교체
-      newBlocks[existingIndex] = { ...blockToApply }
-    } else {
-      // 존재하지 않으면 적절한 위치에 삽입
-      // sourceIndex를 기준으로 삽입 위치 결정
-      if (sourceIndex >= 0 && sourceIndex <= newBlocks.length) {
-        newBlocks.splice(sourceIndex, 0, { ...blockToApply })
+    const currentText = getVisibleBlockText(currentBlock)
+    const leftText = getVisibleBlockText(row.leftBlock)
+    const rightText = getVisibleBlockText(row.rightBlock)
+    const nextText = applyRegionText(currentText, leftText, rightText, regionIndex, side)
+
+    currentBlocks[matchIndex] = setBlockText(currentBlock, nextText)
+    const nextData = createOutputData(currentBlocks)
+    setMergedData(nextData)
+    await editorRef.current?.updateData(nextData)
+  }
+
+  const restoreRegion = async (row: MergeRow, regionIndex: number) => {
+    if (!row.leftBlock || !row.rightBlock) {
+      await restoreWholeRow(row)
+      return
+    }
+
+    const currentData = (await editorRef.current?.saveData()) ?? mergedData
+    const currentBlocks = cloneData((currentData.blocks as EditorBlock[]) ?? [])
+    const matchIndex = findClosestBlockIndex(currentBlocks, row)
+
+    if (matchIndex < 0) {
+      await restoreWholeRow(row)
+      return
+    }
+
+    const currentBlock = currentBlocks[matchIndex]
+    if (
+      !isEditableTextBlock(currentBlock) ||
+      !isEditableTextBlock(row.leftBlock) ||
+      !isEditableTextBlock(row.rightBlock)
+    ) {
+      await restoreWholeRow(row)
+      return
+    }
+
+    const currentText = getVisibleBlockText(currentBlock)
+    const leftText = getVisibleBlockText(row.leftBlock)
+    const rightText = getVisibleBlockText(row.rightBlock)
+    const nextText = applyRegionText(currentText, leftText, rightText, regionIndex, "right")
+
+    currentBlocks[matchIndex] = setBlockText(currentBlock, nextText)
+    const nextData = createOutputData(currentBlocks)
+    setMergedData(nextData)
+    await editorRef.current?.updateData(nextData)
+  }
+
+  const handleWholeToggle = async (row: MergeRow, side: "left" | "right") => {
+    const key = decisionKey(row, null)
+    const currentDecision = decisions[key] ?? null
+    const nextDecision = currentDecision === side ? null : side
+
+    setDecisions((prev) => {
+      const next = { ...prev }
+      if (nextDecision) {
+        next[key] = nextDecision
       } else {
-        newBlocks.push({ ...blockToApply })
+        delete next[key]
       }
+      return next
+    })
+
+    if (!nextDecision) {
+      await restoreWholeRow(row)
+      return
     }
 
-    console.log("New blocks:", newBlocks)
-
-    const newMergedData = {
-      ...mergedData,
-      blocks: newBlocks,
-    }
-
-    // 외부에서 블록을 적용하는 경우 에디터 데이터를 직접 업데이트
-    setMergedData(newMergedData)
-    if (mergedEditorRef.current) {
-      mergedEditorRef.current.updateData(newMergedData).catch((error) => {
-        console.error("Error updating merged editor:", error)
-      })
-    }
-
-    // 하이라이트 효과
-    setHighlightedBlocks(new Set([blockId]))
-    setTimeout(() => {
-      setHighlightedBlocks(new Set())
-    }, 1000)
+    await applyWholeRow(row, nextDecision)
   }
 
-  // 충돌 블록을 머지 데이터에 적용
-  const applyConflictBlock = (fromSide: "base" | "target") => {
-    if (!currentConflict) return
+  const handleRegionToggle = async (
+    row: MergeRow,
+    side: "left" | "right",
+    regionIndex: number,
+  ) => {
+    const key = decisionKey(row, regionIndex)
+    const currentDecision = decisions[key] ?? null
+    const nextDecision = currentDecision === side ? null : side
 
-    const newBlocks = [...mergedData.blocks]
-    const conflictIndex = currentConflict.index
-
-    if (currentConflict.type === "added" && fromSide === "target") {
-      // target에서 추가된 블록
-      const block = currentConflict.block
-      if (block) {
-        newBlocks.splice(conflictIndex, 0, block)
+    setDecisions((prev) => {
+      const next = { ...prev }
+      if (nextDecision) {
+        next[key] = nextDecision
+      } else {
+        delete next[key]
       }
-    } else if (currentConflict.type === "deleted" && fromSide === "base") {
-      // base에서 삭제된 블록은 제거
-      const blockId = currentConflict.block?.id
-      const index = newBlocks.findIndex((b) => b.id === blockId)
-      if (index !== -1) {
-        newBlocks.splice(index, 1)
-      }
-    } else if (currentConflict.type === "modified") {
-      // 수정된 블록
-      const blockToApply =
-        fromSide === "base"
-          ? currentConflict.oldBlock
-          : currentConflict.newBlock
-      if (blockToApply) {
-        const index = newBlocks.findIndex((b) => b.id === blockToApply.id)
-        if (index !== -1) {
-          newBlocks[index] = blockToApply
-        }
-      }
+      return next
+    })
+
+    if (!nextDecision) {
+      await restoreRegion(row, regionIndex)
+      return
     }
 
-    const newMergedData = {
-      ...mergedData,
-      blocks: newBlocks,
-    }
-
-    // 외부에서 충돌을 적용하는 경우 에디터 데이터를 직접 업데이트
-    setMergedData(newMergedData)
-    if (mergedEditorRef.current) {
-      mergedEditorRef.current.updateData(newMergedData).catch((error) => {
-        console.error("Error updating merged editor:", error)
-      })
-    }
-  }
-
-  // 모든 변경사항을 한쪽에서 가져오기
-  const applyAllFromSide = (side: "base" | "target") => {
-    console.log("Applying all from side:", side)
-    const sourceData = side === "base" ? baseData : targetData
-    console.log("Source data:", sourceData)
-
-    const newMergedData = {
-      ...sourceData,
-    }
-
-    // 외부에서 모든 블록을 적용하는 경우 에디터 데이터를 직접 업데이트
-    setMergedData(newMergedData)
-    if (mergedEditorRef.current) {
-      mergedEditorRef.current.updateData(newMergedData).catch((error) => {
-        console.error("Error updating merged editor:", error)
-      })
-    }
-
-    // 모든 블록을 하이라이트 효과로 표시
-    const allBlockIds = sourceData.blocks
-      .map((block) => block.id || "")
-      .filter((id) => id)
-    setHighlightedBlocks(new Set(allBlockIds))
-    setTimeout(() => {
-      setHighlightedBlocks(new Set())
-    }, 1500)
-
-    console.log("Merged data updated successfully")
-  }
-
-  // 에디터 데이터 변경 핸들러
-  const handleMergedDataChange = (data: OutputData) => {
-    setMergedData(data)
+    await applyRegion(row, nextDecision, regionIndex)
   }
 
   const handleSave = async () => {
-    // 저장 시에는 현재 에디터 상태를 직접 가져와서 사용
-    let dataToSave = mergedData
-
-    if (mergedEditorRef.current) {
-      try {
-        const currentData = await mergedEditorRef.current.saveData()
-        if (currentData) {
-          dataToSave = currentData
-        }
-      } catch (error) {
-        console.error("Error saving editor data:", error)
-      }
-    }
-
-    onSave(dataToSave)
-  }
-
-  const navigateConflict = (direction: "prev" | "next") => {
-    if (conflicts.length === 0) return
-
-    if (direction === "next") {
-      setSelectedConflictIndex((prev) =>
-        prev < conflicts.length - 1 ? prev + 1 : 0,
-      )
-    } else {
-      setSelectedConflictIndex((prev) =>
-        prev > 0 ? prev - 1 : conflicts.length - 1,
-      )
-    }
+    const latestData = (await editorRef.current?.saveData()) ?? mergedData
+    onSave(latestData)
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <GitMerge className="h-5 w-5 text-gray-600" />
-          <h1 className="text-lg font-semibold">문서 병합</h1>
-
-          {conflicts.length > 0 && (
-            <div className="flex items-center gap-2 ml-6">
-              <AlertCircle className="h-4 w-4 text-orange-500" />
-              <span className="text-sm text-gray-600">
-                {conflicts.length}개의 충돌
-              </span>
-
-              <div className="flex items-center gap-1 ml-4">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => navigateConflict("prev")}
-                  disabled={conflicts.length === 0}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm text-gray-600 min-w-[60px] text-center">
-                  {selectedConflictIndex + 1} / {conflicts.length}
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => navigateConflict("next")}
-                  disabled={conflicts.length === 0}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+    <div className={cn("flex h-full min-h-0 flex-col bg-white", className)}>
+      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <GitMerge className="h-4 w-4" />
+            {title}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            좌우 문서 안에서 색으로 표시된 차이를 직접 눌러 가운데 결과를 조립합니다. 같은 표시를 다시 누르면 기준 상태로 원복됩니다.
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowBlockDetails(!showBlockDetails)}
-          >
-            {showBlockDetails ? (
-              <EyeOff className="h-4 w-4 mr-1" />
-            ) : (
-              <Eye className="h-4 w-4 mr-1" />
-            )}
-            블록 상세
+          <Button size="sm" variant="outline" onClick={() => applyWholeDocument("left")}>
+            <ChevronsLeft className="h-4 w-4" />
+            왼쪽 모두 반영
           </Button>
-
-          <div className="w-px h-6 bg-gray-300 mx-2" />
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => applyAllFromSide("base")}
-          >
-            <ChevronsLeft className="h-4 w-4 mr-1" />
-            모두 Base 적용
+          <Button size="sm" variant="outline" onClick={() => applyWholeDocument("right")}>
+            오른쪽 모두 반영
+            <ChevronsRight className="h-4 w-4" />
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => applyAllFromSide("target")}
-          >
-            모두 Target 적용
-            <ChevronsRight className="h-4 w-4 ml-1" />
-          </Button>
-
-          <div className="w-px h-6 bg-gray-300 mx-2" />
-
-          <Button size="sm" variant="ghost" onClick={onCancel}>
-            <X className="h-4 w-4 mr-1" />
-            취소
+          <Button size="sm" variant="outline" onClick={onCancel}>
+            <X className="h-4 w-4" />
+            병합 종료
           </Button>
           <Button size="sm" onClick={handleSave}>
-            <Check className="h-4 w-4 mr-1" />
-            병합 완료
+            <Check className="h-4 w-4" />
+            병합 적용
           </Button>
         </div>
       </div>
 
-      {/* 3-way merge 뷰 */}
-      <div className="flex-1 flex">
-        {/* Base 패널 */}
-        <div className="flex-1 flex flex-col border-r">
-          <div className="bg-gray-100 px-4 py-2 border-b flex items-center justify-between">
-            <span className="font-medium text-sm">Base (원본)</span>
-            {currentConflict && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => applyConflictBlock("base")}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          <div className="flex-1 overflow-auto bg-white">
-            {showBlockDetails ? (
-              <div className="p-4">
-                {baseData.blocks.map((block) => (
-                  <BlockPreview
-                    key={block.id}
-                    block={block as EditorBlock}
-                    side="base"
-                    isHighlighted={highlightedBlocks.has(block.id || "")}
-                    onApply={() => applyBlockFromSide(block.id || "", "base")}
-                  />
-                ))}
-              </div>
-            ) : (
-              <DocumentEditor isEditable={false} initialData={baseData} />
-            )}
-          </div>
-        </div>
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)_minmax(0,1fr)]">
+        <PreviewPane
+          label={baseLabel}
+          subtitle="기존 문서"
+          side="left"
+          rows={rows}
+          decisions={decisions}
+          onSelectWhole={(row) => void handleWholeToggle(row, "left")}
+          onSelectRegion={(row, _side, regionIndex) =>
+            void handleRegionToggle(row, "left", regionIndex)
+          }
+        />
 
-        {/* Merged 패널 (중앙) */}
-        <div className="flex-1 flex flex-col border-r">
-          <div className="bg-blue-100 px-4 py-2 border-b">
-            <span className="font-medium text-sm">병합 결과</span>
+        <div className="min-h-0 border-x border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <div className="text-sm font-semibold text-slate-900">병합 결과</div>
+            <div className="mt-1 text-xs text-slate-500">
+              공통 내용은 그대로 유지되고, 선택한 차이만 현재 문서에 반영됩니다.
+            </div>
           </div>
-          <div className="flex-1 overflow-auto bg-white">
+          <div className="h-full min-h-0 overflow-auto">
             <DocumentEditor
-              ref={mergedEditorRef}
+              ref={editorRef}
+              key="merge-result-editor"
               isEditable={true}
               initialData={mergedData}
-              onDataChange={handleMergedDataChange}
-              shouldUpdateOnChange={true}
+              onDataChange={setMergedData}
               disableAutoUpdate={true}
+              minimalChrome={true}
+              contentLayout="document"
             />
           </div>
         </div>
 
-        {/* Target 패널 */}
-        <div className="flex-1 flex flex-col">
-          <div className="bg-gray-100 px-4 py-2 border-b flex items-center justify-between">
-            {currentConflict && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => applyConflictBlock("target")}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <span className="font-medium text-sm">Target (변경사항)</span>
-          </div>
-          <div className="flex-1 overflow-auto bg-white">
-            {showBlockDetails ? (
-              <div className="p-4">
-                {targetData.blocks.map((block) => (
-                  <BlockPreview
-                    key={block.id}
-                    block={block as EditorBlock}
-                    side="target"
-                    isHighlighted={highlightedBlocks.has(block.id || "")}
-                    onApply={() => applyBlockFromSide(block.id || "", "target")}
-                  />
-                ))}
-              </div>
-            ) : (
-              <DocumentEditor isEditable={false} initialData={targetData} />
-            )}
-          </div>
-        </div>
+        <PreviewPane
+          label={targetLabel}
+          subtitle="변경된 문서"
+          side="right"
+          rows={rows}
+          decisions={decisions}
+          onSelectWhole={(row) => void handleWholeToggle(row, "right")}
+          onSelectRegion={(row, _side, regionIndex) =>
+            void handleRegionToggle(row, "right", regionIndex)
+          }
+        />
       </div>
-
-      {/* 충돌 정보 바 */}
-      {currentConflict && (
-        <div className="bg-orange-50 border-t px-4 py-2">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-orange-600" />
-            <span className="text-sm text-orange-800">
-              충돌 유형:{" "}
-              {currentConflict.type === "added"
-                ? "추가됨"
-                : currentConflict.type === "deleted"
-                  ? "삭제됨"
-                  : currentConflict.type === "modified"
-                    ? "수정됨"
-                    : "알 수 없음"}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

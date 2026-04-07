@@ -5,6 +5,7 @@ import {
   CommitAPIApi,
   Configuration,
   DocumentAPIApi,
+  MergeAPIApi,
   SaveAPIApi,
 } from "./__generated__"
 
@@ -35,5 +36,6 @@ export const apiClient = {
   branch: new BranchAPIApi(config),
   commit: new CommitAPIApi(config),
   document: new DocumentAPIApi(config),
+  merge: new MergeAPIApi(config),
   save: new SaveAPIApi(config),
 }

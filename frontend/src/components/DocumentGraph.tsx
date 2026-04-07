@@ -142,10 +142,15 @@ export default function DocumentGraph({
   const flowKey = `${data.branches.length}-${data.commits.length}-${data.edges.length}`
   const activeCommitId =
     currentCommitId ??
-    (currentSaveId ? null : mainBranch?.leafCommitId?.toString())
+    (currentSaveId
+      ? null
+      : mainBranch?.leafCommitId != null
+        ? mainBranch.leafCommitId.toString()
+        : null)
   const activeSaveId = currentSaveId
   const isMainBranchLeafCommit =
-    mainBranch?.leafCommitId.toString() === activeCommitId
+    mainBranch?.leafCommitId != null &&
+    mainBranch.leafCommitId.toString() === activeCommitId
 
   const { nodes: rawNodes, edges } = useGraphRender({
     data,

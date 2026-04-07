@@ -32,7 +32,9 @@ export function useGraphData({ documentId }: UseGraphDataProps) {
       return transformApiResponseToGraphData(response)
     },
     enabled: !!documentId,
+    placeholderData: (previousData) => previousData,
     refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -63,10 +65,10 @@ function transformBranchDto(dto: BranchDto) {
     id: dto.id || 0,
     name: dto.name || "",
     createdAt: dto.createdAt?.toISOString() || new Date().toISOString(),
-    fromCommitId: dto.fromCommitId || null,
-    rootCommitId: dto.rootCommitId || 0,
-    leafCommitId: dto.leafCommitId || 0,
-    saveId: dto.saveId || null,
+    fromCommitId: dto.fromCommitId ?? null,
+    rootCommitId: dto.rootCommitId ?? null,
+    leafCommitId: dto.leafCommitId ?? null,
+    saveId: dto.saveId ?? null,
   }
 }
 
@@ -96,7 +98,9 @@ export function useGraphRender({
     const commitDepths = new Map<number, number>()
 
     // 각 브랜치의 루트 커밋들을 찾아서 depth 0으로 설정
-    const rootCommits = data.branches.map((branch) => branch.rootCommitId)
+    const rootCommits = data.branches
+      .map((branch) => branch.rootCommitId)
+      .filter((commitId): commitId is number => commitId != null)
     for (const commitId of rootCommits) {
       commitDepths.set(commitId, 0)
     }
@@ -244,16 +248,15 @@ export function useGraphRender({
             branchIndex * GRAPH_LAYOUT.BRANCH_SPACING +
             GRAPH_LAYOUT.BASE_X_OFFSET
 
-          if (branch.fromCommitId) {
-            const depth = commitDepths.get(branch.fromCommitId) + 1
-            if (depth) {
-              yPosition =
-                depth * GRAPH_LAYOUT.ROW_SPACING + GRAPH_LAYOUT.BASE_Y_OFFSET
-            }
-          } else {
-            // 커밋이 없는 브랜치의 경우 기본 위치 설정
-            yPosition = GRAPH_LAYOUT.BASE_Y_OFFSET
-          }
+          const parentDepth =
+            branch.fromCommitId != null
+              ? commitDepths.get(branch.fromCommitId)
+              : undefined
+          yPosition =
+            parentDepth != null
+              ? (parentDepth + 1) * GRAPH_LAYOUT.ROW_SPACING +
+                GRAPH_LAYOUT.BASE_Y_OFFSET
+              : GRAPH_LAYOUT.BASE_Y_OFFSET
         }
 
         const saveNodeId = `save-${branch.saveId}`
@@ -288,7 +291,7 @@ export function useGraphRender({
         } as GraphNode)
 
         // leafCommitId가 있는 경우에만 엣지 생성
-        if (branch.leafCommitId) {
+        if (branch.leafCommitId != null) {
           tempEdgesArray.push({
             id: `temp-edge-${branch.id}`,
             source: `commit-${branch.leafCommitId.toString()}`,
@@ -302,7 +305,7 @@ export function useGraphRender({
           })
         }
 
-        if (!branch.leafCommitId && branch.fromCommitId) {
+        if (branch.leafCommitId == null && branch.fromCommitId != null) {
           tempEdgesArray.push({
             id: `temp-edge-${branch.id}`,
             source: `commit-${branch.fromCommitId.toString()}`,

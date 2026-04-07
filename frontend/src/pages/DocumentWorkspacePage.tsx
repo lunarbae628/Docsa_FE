@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 import { useNavigate, useParams, useSearchParams } from "react-router"
 import ResizableLayout from "@/layouts/ResizableLayout"
-import DocumentGraph from "@/components/DocumentGraph"
+import DocumentWorkspaceGraphPanel from "@/components/DocumentWorkspaceGraphPanel"
 import DocumentCompareView from "@/components/DocumentCompareView"
 import DocumentEditor from "@/components/DocumentEditor"
 import DocumentMergeView from "@/components/DocumentMergeView"
@@ -18,7 +18,8 @@ import BranchEditModal from "@/components/BranchEditModal"
 import SaveCommitModal from "@/components/SaveCommitModal"
 import { Button } from "@/components/ui/button"
 import { apiClient } from "@/api/apiClient"
-import { useGraphData } from "@/hooks/useGraphData"
+import { useDocumentWorkspaceGraphState } from "@/hooks/useDocumentWorkspaceGraphState"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,8 @@ import {
   editorDataToMarkdown,
   markdownToEditorData,
 } from "@/lib/editorMarkdown"
+import { useDocumentContent } from "@/hooks/useDocumentContent"
+import { useSnapshotContent } from "@/hooks/useSnapshotContent"
 
 type SnapshotBlock = { [key: string]: any }
 
@@ -44,7 +47,7 @@ type BranchRecord = {
   id: number
   name: string
   fromCommitId: number | null
-  rootCommitId: number
+  rootCommitId: number | null
   headCommitId: number | null
   saveId: number | null
 }
@@ -226,6 +229,40 @@ function getNextId(list: Array<{ id: number }>) {
   return Math.max(...list.map((item) => item.id), 0) + 1
 }
 
+function toBranchSlug(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9가-힣-_]/g, "")
+}
+
+function createUniqueBranchName(
+  sourceTitle: string,
+  targetTitle: string,
+  branches: BranchRecord[],
+) {
+  const baseName = [
+    "merge",
+    toBranchSlug(sourceTitle).slice(0, 18),
+    toBranchSlug(targetTitle).slice(0, 18),
+  ]
+    .filter(Boolean)
+    .join("-")
+
+  const usedNames = new Set(branches.map((branch) => branch.name))
+  if (!usedNames.has(baseName)) {
+    return baseName
+  }
+
+  let suffix = 2
+  while (usedNames.has(`${baseName}-${suffix}`)) {
+    suffix += 1
+  }
+
+  return `${baseName}-${suffix}`
+}
+
 function buildGraphData(
   branches: BranchRecord[],
   commits: CommitRecord[],
@@ -267,9 +304,108 @@ function buildGraphData(
       createdAt: "2026-04-05T09:00:00+09:00",
       fromCommitId: branch.fromCommitId,
       rootCommitId: branch.rootCommitId,
-      leafCommitId: branch.headCommitId ?? 0,
+      leafCommitId: branch.headCommitId ?? null,
       saveId: branch.saveId ?? null,
     })),
+  }
+}
+
+function updateGraphCacheAfterCommitCreate(
+  graphData: GraphDataType,
+  branchId: number,
+  commit: GraphDataType["commits"][number],
+) {
+  const nextBranches = graphData.branches.map((branch) =>
+    branch.id === branchId
+      ? {
+          ...branch,
+          rootCommitId: branch.rootCommitId ?? commit.id,
+          leafCommitId: commit.id,
+        }
+      : branch,
+  )
+
+  const targetBranch = graphData.branches.find((branch) => branch.id === branchId)
+  const previousCommitId = targetBranch?.leafCommitId ?? null
+
+  const nextEdges =
+    previousCommitId && previousCommitId !== commit.id
+      ? [...graphData.edges, { from: previousCommitId, to: commit.id }]
+      : targetBranch?.fromCommitId
+        ? [...graphData.edges, { from: targetBranch.fromCommitId, to: commit.id }]
+        : graphData.edges
+
+  return {
+    ...graphData,
+    commits: [...graphData.commits, commit],
+    edges: nextEdges,
+    branches: nextBranches,
+  }
+}
+
+function updateGraphCacheAfterBranchCreate(
+  graphData: GraphDataType,
+  branch: GraphDataType["branches"][number],
+) {
+  return {
+    ...graphData,
+    branches: [...graphData.branches, branch],
+  }
+}
+
+function updateGraphCacheAfterBranchRename(
+  graphData: GraphDataType,
+  branchId: number,
+  name: string,
+) {
+  return {
+    ...graphData,
+    branches: graphData.branches.map((branch) =>
+      branch.id === branchId ? { ...branch, name } : branch,
+    ),
+  }
+}
+
+function updateGraphCacheAfterCommitDelete(
+  graphData: GraphDataType,
+  branchId: number,
+  commitId: number,
+) {
+  const remainingCommits = graphData.commits.filter((commit) => commit.id !== commitId)
+  const branchCommits = remainingCommits
+    .filter((commit) => commit.branchId === branchId)
+    .sort((a, b) => a.id - b.id)
+  const nextLeafCommitId = branchCommits[branchCommits.length - 1]?.id ?? null
+
+  return {
+    ...graphData,
+    commits: remainingCommits,
+    edges: graphData.edges.filter(
+      (edge) => edge.from !== commitId && edge.to !== commitId,
+    ),
+    branches: graphData.branches.map((branch) =>
+      branch.id === branchId ? { ...branch, leafCommitId: nextLeafCommitId } : branch,
+    ),
+  }
+}
+
+function updateGraphCacheAfterBranchDelete(
+  graphData: GraphDataType,
+  branchId: number,
+) {
+  const removedCommitIds = new Set(
+    graphData.commits
+      .filter((commit) => commit.branchId === branchId)
+      .map((commit) => commit.id),
+  )
+
+  return {
+    ...graphData,
+    branches: graphData.branches.filter((branch) => branch.id !== branchId),
+    commits: graphData.commits.filter((commit) => commit.branchId !== branchId),
+    edges: graphData.edges.filter(
+      (edge) => !removedCommitIds.has(edge.from) && !removedCommitIds.has(edge.to),
+    ),
   }
 }
 
@@ -319,23 +455,30 @@ function resolveViewFromParams(
 
   if (mode === "save" && saveId) {
     const workspace = workspaces.find((item) => item.id === saveId)
-    if (workspace) {
-      return {
-        mode: "workspace",
-        branchId: workspace.branchId,
-        workspaceId: workspace.id,
-      }
+    const branch =
+      branches.find((item) => item.saveId === saveId) ??
+      (workspace ? branches.find((item) => item.id === workspace.branchId) : null) ??
+      null
+
+    return {
+      mode: "workspace",
+      branchId: workspace?.branchId ?? branch?.id ?? 0,
+      workspaceId: workspace?.id ?? saveId,
     }
   }
 
   if (mode === "commit" && commitId) {
     const commit = commits.find((item) => item.id === commitId)
-    if (commit) {
-      return {
-        mode: "commit",
-        branchId: commit.branchId,
-        commitId: commit.id,
-      }
+    const branch =
+      branches.find((item) => item.headCommitId === commitId) ??
+      branches.find((item) => item.rootCommitId === commitId) ??
+      branches.find((item) => item.fromCommitId === commitId) ??
+      null
+
+    return {
+      mode: "commit",
+      branchId: commit?.branchId ?? branch?.id ?? 0,
+      commitId: commit?.id ?? commitId,
     }
   }
 
@@ -370,6 +513,30 @@ function resolveViewFromParams(
     branchId: 1,
     workspaceId: 1,
   }
+}
+
+function resolveImmediateViewFromParams(params: URLSearchParams): ViewState | null {
+  const mode = params.get("mode")
+  const saveId = Number(params.get("saveId") || 0)
+  const commitId = Number(params.get("commitId") || 0)
+
+  if (mode === "save" && saveId) {
+    return {
+      mode: "workspace",
+      branchId: 0,
+      workspaceId: saveId,
+    }
+  }
+
+  if (mode === "commit" && commitId) {
+    return {
+      mode: "commit",
+      branchId: 0,
+      commitId,
+    }
+  }
+
+  return null
 }
 
 function isSameView(a: ViewState, b: ViewState) {
@@ -412,11 +579,21 @@ export default function DocumentWorkspacePage({
   demoMode?: boolean
 }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { id: documentIdParam } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryDocumentId = Number(documentIdParam || 0)
   const isRealDocument = Number.isFinite(queryDocumentId) && queryDocumentId > 0
   const documentId = isRealDocument ? queryDocumentId : 0
+  const requestedMode = searchParams.get("mode")
+  const requestedSaveId =
+    requestedMode === "save" ? Number(searchParams.get("saveId") || 0) : 0
+  const requestedCommitId =
+    requestedMode === "commit" ? Number(searchParams.get("commitId") || 0) : 0
+  const requestedDocumentMode =
+    requestedMode === "save" || requestedMode === "commit"
+      ? requestedMode
+      : null
 
   const [branches, setBranches] = useState<BranchRecord[]>(
     demoMode ? initialBranches : [],
@@ -434,7 +611,7 @@ export default function DocumentWorkspacePage({
           branchId: 1,
           workspaceId: 1,
         }
-      : {
+      : resolveImmediateViewFromParams(searchParams) ?? {
           mode: "workspace",
           branchId: 0,
           workspaceId: 0,
@@ -455,7 +632,16 @@ export default function DocumentWorkspacePage({
   const workspacesRef = useRef<WorkspaceRecord[]>(demoMode ? initialWorkspaces : [])
   const previousDocumentIdRef = useRef<number | null>(null)
 
-  const graphQuery = useGraphData({ documentId })
+  const { graphQuery, graphData, mainBranch: serverMainBranch, isInitialLoading } =
+    useDocumentWorkspaceGraphState(documentId)
+  const directSelectedContent = useDocumentContent({
+    documentMode: (requestedDocumentMode ?? "save") as "save" | "commit",
+    commitId: requestedCommitId ? String(requestedCommitId) : null,
+    saveId: requestedSaveId ? String(requestedSaveId) : null,
+    compareId: null,
+    documentId,
+    currentBranchLastCommitId: null,
+  })
 
   useEffect(() => {
     commitsRef.current = commits
@@ -509,7 +695,7 @@ export default function DocumentWorkspacePage({
           name: branch.name,
           fromCommitId: branch.fromCommitId,
           rootCommitId: branch.rootCommitId,
-          headCommitId: branch.leafCommitId || null,
+          headCommitId: branch.leafCommitId ?? null,
           saveId: branch.saveId ?? null,
         }))
 
@@ -578,6 +764,121 @@ export default function DocumentWorkspacePage({
 
   useEffect(() => {
     if (demoMode || !isRealDocument) return
+
+    const immediateView = resolveImmediateViewFromParams(searchParams)
+    if (!immediateView) return
+
+    setView((prev) => (isSameView(prev, immediateView) ? prev : immediateView))
+  }, [demoMode, isRealDocument, searchParams])
+
+  useEffect(() => {
+    if (demoMode || !isRealDocument) return
+
+    if (!requestedDocumentMode) return
+    if (!directSelectedContent.originalData) return
+
+    if (requestedDocumentMode === "save" && requestedSaveId) {
+      const nextBlocks = directSelectedContent.originalData as SnapshotBlock[]
+      const nextContent = blocksToMarkdown(nextBlocks)
+      const saveId = requestedSaveId
+
+      setWorkspaces((prev) => {
+        const existing = prev.find((workspace) => workspace.id === saveId)
+
+        if (!existing) {
+          return [
+            ...prev,
+            {
+              id: saveId,
+              branchId: branches.find((branch) => branch.saveId === saveId)?.id ?? 0,
+              content: nextContent,
+              blocks: nextBlocks,
+              loaded: true,
+            },
+          ]
+        }
+
+        return prev.map((workspace) =>
+          workspace.id === saveId
+            ? {
+                ...workspace,
+                branchId:
+                  workspace.branchId ||
+                  branches.find((branch) => branch.saveId === saveId)?.id ||
+                  0,
+                content: nextContent,
+                blocks: nextBlocks,
+                loaded: true,
+              }
+            : workspace,
+        )
+      })
+
+      return
+    }
+
+    if (requestedDocumentMode !== "commit" || !requestedCommitId) return
+
+    const nextBlocks = directSelectedContent.originalData as SnapshotBlock[]
+    const nextContent = blocksToMarkdown(nextBlocks)
+    const commitId = requestedCommitId
+
+    setCommits((prev) => {
+      const existing = prev.find((commit) => commit.id === commitId)
+
+      if (!existing) {
+        return [
+          ...prev,
+          {
+            id: commitId,
+            branchId:
+              branches.find((branch) =>
+                [branch.headCommitId, branch.rootCommitId, branch.fromCommitId].includes(
+                  commitId,
+                ),
+              )?.id ?? 0,
+            title: `기록 ${commitId}`,
+            description: "",
+            content: nextContent,
+            blocks: nextBlocks,
+            createdAt: new Date().toISOString(),
+            kind: "commit",
+            loaded: true,
+          },
+        ]
+      }
+
+      return prev.map((commit) =>
+        commit.id === commitId
+          ? {
+              ...commit,
+              branchId:
+                commit.branchId ||
+                branches.find((branch) =>
+                  [branch.headCommitId, branch.rootCommitId, branch.fromCommitId].includes(
+                    commitId,
+                  ),
+                )?.id ||
+                0,
+              content: nextContent,
+              blocks: nextBlocks,
+              loaded: true,
+            }
+          : commit,
+      )
+    })
+  }, [
+    branches,
+    demoMode,
+    directSelectedContent.originalData,
+    isRealDocument,
+    requestedCommitId,
+    requestedDocumentMode,
+    requestedSaveId,
+  ])
+
+  useEffect(() => {
+    if (demoMode || !isRealDocument) return
     if (!graphQuery.data) return
 
     void hydrateFromGraph(graphQuery.data, searchParams, true)
@@ -607,18 +908,38 @@ export default function DocumentWorkspacePage({
         })
         const nextBlocks = (response.content ?? []) as SnapshotBlock[]
 
-        setCommits((prev) =>
-          prev.map((commit) =>
+        setCommits((prev) => {
+          const nextContent = blocksToMarkdown(nextBlocks)
+          const existing = prev.find((commit) => commit.id === commitId)
+
+          if (!existing) {
+            return [
+              ...prev,
+              {
+                id: commitId,
+                branchId: 0,
+                title: `기록 ${commitId}`,
+                description: "",
+                content: nextContent,
+                blocks: nextBlocks,
+                createdAt: new Date().toISOString(),
+                kind: "commit",
+                loaded: true,
+              },
+            ]
+          }
+
+          return prev.map((commit) =>
             commit.id === commitId
               ? {
                   ...commit,
                   blocks: nextBlocks,
-                  content: blocksToMarkdown(nextBlocks),
+                  content: nextContent,
                   loaded: true,
                 }
               : commit,
-          ),
-        )
+          )
+        })
       } finally {
         loadingCommitIdsRef.current.delete(commitId)
       }
@@ -642,18 +963,34 @@ export default function DocumentWorkspacePage({
         })
         const nextBlocks = (response.content ?? []) as SnapshotBlock[]
 
-        setWorkspaces((prev) =>
-          prev.map((workspace) =>
+        setWorkspaces((prev) => {
+          const nextContent = blocksToMarkdown(nextBlocks)
+          const existing = prev.find((workspace) => workspace.id === workspaceId)
+
+          if (!existing) {
+            return [
+              ...prev,
+              {
+                id: workspaceId,
+                branchId: 0,
+                content: nextContent,
+                blocks: nextBlocks,
+                loaded: true,
+              },
+            ]
+          }
+
+          return prev.map((workspace) =>
             workspace.id === workspaceId
               ? {
                   ...workspace,
                   blocks: nextBlocks,
-                  content: blocksToMarkdown(nextBlocks),
+                  content: nextContent,
                   loaded: true,
                 }
               : workspace,
-          ),
-        )
+          )
+        })
       } finally {
         loadingWorkspaceIdsRef.current.delete(workspaceId)
       }
@@ -664,56 +1001,31 @@ export default function DocumentWorkspacePage({
   useEffect(() => {
     if (demoMode || !isRealDocument) return
 
-    const commitIdsToLoad = new Set<number>()
-    const workspaceIdsToLoad = new Set<number>()
+    const isDirectRequestedWorkspace =
+      requestedDocumentMode === "save" && requestedSaveId > 0
+    const isDirectRequestedCommit =
+      requestedDocumentMode === "commit" && requestedCommitId > 0
 
     if (view.mode === "workspace" && view.workspaceId) {
-      workspaceIdsToLoad.add(view.workspaceId)
+      if (!(isDirectRequestedWorkspace && view.workspaceId === requestedSaveId)) {
+        void loadWorkspaceContent(view.workspaceId)
+      }
+      return
     }
 
     if (view.mode === "commit" && view.commitId) {
-      commitIdsToLoad.add(view.commitId)
-    }
-
-    if (view.mode === "compare") {
-      if (view.baseKind === "commit") {
-        commitIdsToLoad.add(view.baseId)
-      } else {
-        workspaceIdsToLoad.add(view.baseId)
-      }
-
-      if (view.compareKind === "commit" && view.compareId) {
-        commitIdsToLoad.add(view.compareId)
-      } else if (view.compareKind === "workspace" && view.compareId) {
-        workspaceIdsToLoad.add(view.compareId)
+      if (!(isDirectRequestedCommit && view.commitId === requestedCommitId)) {
+        void loadCommitContent(view.commitId)
       }
     }
-
-    if (view.mode === "merge") {
-      if (view.sourceKind === "commit") {
-        commitIdsToLoad.add(view.sourceId)
-      } else {
-        workspaceIdsToLoad.add(view.sourceId)
-      }
-
-      if (view.targetKind === "commit" && view.targetId) {
-        commitIdsToLoad.add(view.targetId)
-      } else if (view.targetKind === "workspace" && view.targetId) {
-        workspaceIdsToLoad.add(view.targetId)
-      }
-    }
-
-    commitIdsToLoad.forEach((commitId) => {
-      void loadCommitContent(commitId)
-    })
-    workspaceIdsToLoad.forEach((workspaceId) => {
-      void loadWorkspaceContent(workspaceId)
-    })
   }, [
     demoMode,
     isRealDocument,
     loadCommitContent,
     loadWorkspaceContent,
+    requestedCommitId,
+    requestedDocumentMode,
+    requestedSaveId,
     view,
   ])
 
@@ -743,18 +1055,9 @@ export default function DocumentWorkspacePage({
     }
   }, [])
 
-  const graphData = useMemo(
-    () => buildGraphData(branches, commits),
-    [branches, commits],
-  )
-
   const mainBranch = useMemo(() => {
-    return (
-      graphData.branches.find((branch) => branch.name === "main") ??
-      graphData.branches[0] ??
-      null
-    )
-  }, [graphData.branches])
+    return serverMainBranch
+  }, [serverMainBranch])
 
   const currentBranch = useMemo(() => {
     return branches.find((branch) => branch.id === view.branchId) ?? null
@@ -838,6 +1141,26 @@ export default function DocumentWorkspacePage({
     }
   }, [branches, commits, view, workspaces])
 
+  const compareBaseSnapshotQuery = useSnapshotContent({
+    documentId,
+    kind: view.mode === "compare" ? view.baseKind : null,
+    id: view.mode === "compare" ? view.baseId : null,
+    enabled: !demoMode && isRealDocument && view.mode === "compare",
+  })
+
+  const compareTargetSnapshotQuery = useSnapshotContent({
+    documentId,
+    kind:
+      view.mode === "compare" && view.compareKind ? view.compareKind : null,
+    id: view.mode === "compare" ? view.compareId : null,
+    enabled:
+      !demoMode &&
+      isRealDocument &&
+      view.mode === "compare" &&
+      !!view.compareKind &&
+      !!view.compareId,
+  })
+
   const mainWorkspace = useMemo(() => {
     if (!mainBranch) return null
     return workspaces.find((workspace) => workspace.branchId === mainBranch.id) ?? null
@@ -911,13 +1234,76 @@ export default function DocumentWorkspacePage({
     }
   }, [branches, commits, view, workspaces])
 
+  const mergeSourceSnapshotQuery = useSnapshotContent({
+    documentId,
+    kind: view.mode === "merge" ? view.sourceKind : null,
+    id: view.mode === "merge" ? view.sourceId : null,
+    enabled: !demoMode && isRealDocument && view.mode === "merge",
+  })
+
+  const mergeTargetSnapshotQuery = useSnapshotContent({
+    documentId,
+    kind: view.mode === "merge" && view.targetKind ? view.targetKind : null,
+    id: view.mode === "merge" ? view.targetId : null,
+    enabled:
+      !demoMode &&
+      isRealDocument &&
+      view.mode === "merge" &&
+      !!view.targetKind &&
+      !!view.targetId,
+  })
+
   const mergeSourceData = useMemo(() => {
-    return mergeSourceItem ? createOutputData(mergeSourceItem.blocks) : null
-  }, [mergeSourceItem])
+    if (!mergeSourceItem) return null
+    if (demoMode || !isRealDocument) {
+      return createOutputData(mergeSourceItem.blocks)
+    }
+    return createOutputData(mergeSourceSnapshotQuery.data ?? [])
+  }, [
+    demoMode,
+    isRealDocument,
+    mergeSourceItem,
+    mergeSourceSnapshotQuery.data,
+  ])
 
   const mergeTargetData = useMemo(() => {
-    return mergeTargetItem ? createOutputData(mergeTargetItem.blocks) : null
-  }, [mergeTargetItem])
+    if (!mergeTargetItem) return null
+    if (demoMode || !isRealDocument) {
+      return createOutputData(mergeTargetItem.blocks)
+    }
+    return createOutputData(mergeTargetSnapshotQuery.data ?? [])
+  }, [
+    demoMode,
+    isRealDocument,
+    mergeTargetItem,
+    mergeTargetSnapshotQuery.data,
+  ])
+
+  const compareBaseData = useMemo(() => {
+    if (!compareBaseItem) return null
+    if (demoMode || !isRealDocument) {
+      return createOutputData(compareBaseItem.blocks)
+    }
+    return createOutputData(compareBaseSnapshotQuery.data ?? [])
+  }, [
+    compareBaseItem,
+    compareBaseSnapshotQuery.data,
+    demoMode,
+    isRealDocument,
+  ])
+
+  const compareTargetData = useMemo(() => {
+    if (!compareTargetItem) return null
+    if (demoMode || !isRealDocument) {
+      return createOutputData(compareTargetItem.blocks)
+    }
+    return createOutputData(compareTargetSnapshotQuery.data ?? [])
+  }, [
+    compareTargetItem,
+    compareTargetSnapshotQuery.data,
+    demoMode,
+    isRealDocument,
+  ])
 
   const currentBranchCommits = useMemo(() => {
     if (!currentBranch) return []
@@ -1061,6 +1447,20 @@ export default function DocumentWorkspacePage({
           throw new Error("기록 ID가 없습니다.")
         }
 
+        queryClient.setQueryData<GraphDataType>(
+          ["graphData", documentId],
+          (current) =>
+            current
+              ? updateGraphCacheAfterCommitCreate(current, currentBranch.id, {
+                  id: result.id,
+                  branchId: currentBranch.id,
+                  title,
+                  description: description || "",
+                  createdAt: new Date().toISOString(),
+                })
+              : current,
+        )
+
         setIsCommitModalOpen(false)
         const nextParams = new URLSearchParams({
           mode: "save",
@@ -1085,6 +1485,7 @@ export default function DocumentWorkspacePage({
       currentWorkspace,
       documentId,
       isRealDocument,
+      queryClient,
       refreshDocumentState,
       setSearchParams,
     ],
@@ -1173,6 +1574,24 @@ export default function DocumentWorkspacePage({
           throw new Error("작업장을 만들지 못했습니다.")
         }
 
+        if (result.branchId) {
+          queryClient.setQueryData<GraphDataType>(
+            ["graphData", documentId],
+            (current) =>
+              current
+                ? updateGraphCacheAfterBranchCreate(current, {
+                    id: result.branchId,
+                    name: branchName,
+                    createdAt: new Date().toISOString(),
+                    fromCommitId: targetCommit.id,
+                    rootCommitId: null,
+                    leafCommitId: null,
+                    saveId: result.saveId ?? null,
+                  })
+                : current,
+          )
+        }
+
         const nextParams = new URLSearchParams({
           mode: "save",
           saveId: String(result.saveId),
@@ -1196,6 +1615,7 @@ export default function DocumentWorkspacePage({
       commits,
       documentId,
       isRealDocument,
+      queryClient,
       refreshDocumentState,
       setSearchParams,
       workspaces,
@@ -1289,6 +1709,13 @@ export default function DocumentWorkspacePage({
           docId: documentId,
           commitId,
         })
+        queryClient.setQueryData<GraphDataType>(
+          ["graphData", documentId],
+          (current) =>
+            current
+              ? updateGraphCacheAfterCommitDelete(current, targetBranch.id, commitId)
+              : current,
+        )
         setDeleteDialog(null)
         await refreshDocumentState(new URLSearchParams(), true)
         setToast(`기록 "${targetCommit.title}"을 삭제했습니다.`)
@@ -1302,7 +1729,15 @@ export default function DocumentWorkspacePage({
         setIsActionPending(false)
       }
     },
-    [branches, commits, documentId, isRealDocument, openCommit, refreshDocumentState],
+    [
+      branches,
+      commits,
+      documentId,
+      isRealDocument,
+      openCommit,
+      queryClient,
+      refreshDocumentState,
+    ],
   )
 
   const handleDeleteBranch = useCallback(
@@ -1336,6 +1771,11 @@ export default function DocumentWorkspacePage({
           documentId,
           branchId,
         })
+        queryClient.setQueryData<GraphDataType>(
+          ["graphData", documentId],
+          (current) =>
+            current ? updateGraphCacheAfterBranchDelete(current, branchId) : current,
+        )
         setDeleteDialog(null)
         await refreshDocumentState(new URLSearchParams(), true)
         setToast(`${targetBranch.name} 브랜치를 삭제하고 main 작업장으로 돌아왔습니다.`)
@@ -1357,6 +1797,7 @@ export default function DocumentWorkspacePage({
       mainBranch,
       mainWorkspace,
       openWorkspaceByBranch,
+      queryClient,
       refreshDocumentState,
     ],
   )
@@ -1365,53 +1806,6 @@ export default function DocumentWorkspacePage({
     async (mergedData: OutputData) => {
       const sourceItem = view.mode === "merge" ? mergeSourceItem : null
       if (!sourceItem || !mergeTargetItem) return
-
-      const targetBranch = branches.find((branch) => branch.id === mergeTargetItem.branchId)
-      const targetWorkspace = workspaces.find(
-        (workspace) => workspace.branchId === mergeTargetItem.branchId,
-      )
-      if (!targetBranch || !targetWorkspace) return
-
-      if (demoMode || !isRealDocument) {
-        const nextCommitId = getNextId(commits)
-        const mergedBlocks = (mergedData.blocks ?? []) as SnapshotBlock[]
-        const mergedContent = editorDataToMarkdown(mergedData)
-
-        setCommits((prev) => [
-          ...prev,
-          {
-            id: nextCommitId,
-            branchId: targetBranch.id,
-            title: `${sourceItem.title} 병합`,
-            description: `${targetBranch.name}에 ${sourceItem.title} 반영`,
-            content: mergedContent,
-            blocks: mergedBlocks,
-            createdAt: new Date().toISOString(),
-            kind: "merge",
-            loaded: true,
-          },
-        ])
-
-        setBranches((prev) =>
-          prev.map((branch) =>
-            branch.id === targetBranch.id
-              ? { ...branch, headCommitId: nextCommitId }
-              : branch,
-          ),
-        )
-
-        setWorkspaces((prev) =>
-          prev.map((workspace) =>
-            workspace.id === targetWorkspace.id
-              ? { ...workspace, content: mergedContent, blocks: mergedBlocks }
-              : workspace,
-          ),
-        )
-
-        openCommit(targetBranch.id, nextCommitId)
-        setToast(`${targetBranch.name}에 ${sourceItem.title} 내용을 병합했습니다.`)
-        return
-      }
 
       const resolveCommitId = (kind: CompareItemKind, id: number) => {
         if (kind === "commit") return id
@@ -1425,6 +1819,52 @@ export default function DocumentWorkspacePage({
           ? resolveCommitId(view.targetKind, view.targetId)
           : null
 
+      const mergeBranchName = createUniqueBranchName(
+        sourceItem.title,
+        mergeTargetItem.title,
+        branches,
+      )
+
+      const targetBranch = branches.find((branch) => branch.id === mergeTargetItem.branchId)
+      const targetWorkspace = workspaces.find(
+        (workspace) => workspace.branchId === mergeTargetItem.branchId,
+      )
+      if (!targetBranch || !targetWorkspace) return
+
+      if (demoMode || !isRealDocument) {
+        const nextBranchId = getNextId(branches)
+        const nextWorkspaceId = getNextId(workspaces)
+        const mergedBlocks = (mergedData.blocks ?? []) as SnapshotBlock[]
+        const mergedContent = editorDataToMarkdown(mergedData)
+
+        setBranches((prev) => [
+          ...prev,
+          {
+            id: nextBranchId,
+            name: mergeBranchName,
+            fromCommitId: targetCommitId ?? baseCommitId,
+            rootCommitId: null,
+            headCommitId: null,
+            saveId: nextWorkspaceId,
+          },
+        ])
+
+        setWorkspaces((prev) => [
+          ...prev,
+          {
+            id: nextWorkspaceId,
+            branchId: nextBranchId,
+            content: mergedContent,
+            blocks: mergedBlocks,
+            loaded: true,
+          },
+        ])
+
+        openWorkspaceByBranch(nextBranchId)
+        setToast(`${mergeBranchName} 작업장을 새로 만들었습니다.`)
+        return
+      }
+
       if (!baseCommitId || !targetCommitId) {
         await alertDialog(
           "현재 백엔드는 저장 상태끼리의 병합을 직접 지원하지 않습니다. 기준 기록을 찾을 수 없습니다.",
@@ -1436,29 +1876,44 @@ export default function DocumentWorkspacePage({
 
       setIsActionPending(true)
       try {
-        const mergeResult = await apiClient.commit.mergeCommit({
+        const mergeResult = await apiClient.merge.merge({
           docId: documentId,
-          mergeCommitRequest: {
-            title: `${sourceItem.title} 병합`,
-            description: `${targetBranch.name}에 ${sourceItem.title} 반영`,
+          mergeRequest: {
+            branchName: mergeBranchName,
             baseCommitId,
             targetCommitId,
             content: (mergedData.blocks ?? []) as SnapshotBlock[],
           },
         })
 
-        if (!mergeResult.id) {
-          throw new Error("병합 기록 ID가 없습니다.")
+        if (!mergeResult.saveId || !mergeResult.branchId) {
+          throw new Error("병합 작업장을 만들지 못했습니다.")
         }
+
+        queryClient.setQueryData<GraphDataType>(
+          ["graphData", documentId],
+          (current) =>
+            current
+              ? updateGraphCacheAfterBranchCreate(current, {
+                  id: mergeResult.branchId,
+                  name: mergeBranchName,
+                  createdAt: new Date().toISOString(),
+                  fromCommitId: targetCommitId,
+                  rootCommitId: null,
+                  leafCommitId: null,
+                  saveId: mergeResult.saveId ?? null,
+                })
+              : current,
+        )
 
         const nextParams = new URLSearchParams({
           mode: "save",
-          saveId: String(targetWorkspace.id),
+          saveId: String(mergeResult.saveId),
         })
         await refreshDocumentState(nextParams, false)
         setSearchParams(nextParams, { replace: true })
 
-        setToast(`${targetBranch.name}에 ${sourceItem.title} 내용을 병합했습니다.`)
+        setToast(`${mergeBranchName} 작업장을 새로 만들었습니다.`)
       } catch (error: any) {
         await alertDialog(
           error.message || "병합 적용에 실패했습니다.",
@@ -1471,12 +1926,12 @@ export default function DocumentWorkspacePage({
     },
     [
       branches,
-      commits,
       documentId,
       isRealDocument,
       mergeSourceItem,
       mergeTargetItem,
-      openCommit,
+      openWorkspaceByBranch,
+      queryClient,
       refreshDocumentState,
       setSearchParams,
       view,
@@ -1546,6 +2001,13 @@ export default function DocumentWorkspacePage({
             name: newName,
           },
         })
+        queryClient.setQueryData<GraphDataType>(
+          ["graphData", documentId],
+          (current) =>
+            current
+              ? updateGraphCacheAfterBranchRename(current, branchId, newName)
+              : current,
+        )
         await refreshDocumentState(searchParams, false)
         setToast(`${newName} 브랜치 이름으로 변경했습니다.`)
       } catch (error: any) {
@@ -1561,6 +2023,7 @@ export default function DocumentWorkspacePage({
     [
       documentId,
       isRealDocument,
+      queryClient,
       refreshDocumentState,
       searchParams,
       view.branchId,
@@ -1583,8 +2046,8 @@ export default function DocumentWorkspacePage({
       name: "main",
       createdAt: new Date().toISOString(),
       fromCommitId: null,
-      rootCommitId: 0,
-      leafCommitId: 0,
+      rootCommitId: null,
+      leafCommitId: null,
       saveId: null,
     } satisfies GraphDataType["branches"][number])
 
@@ -1632,59 +2095,59 @@ export default function DocumentWorkspacePage({
           sidebarClassName="h-full min-h-0"
           mainClassName="h-full min-h-0 bg-slate-100"
         >
-          <div className="h-full min-h-0 bg-slate-100 p-3">
-            <DocumentGraph
-              data={graphData}
-              mainBranch={graphMainBranch}
-              currentBranchId={view.branchId}
-              currentCommitId={
-                view.mode === "commit"
-                  ? String(view.commitId)
-                  : view.mode === "compare" && view.baseKind === "commit"
-                    ? String(view.baseId)
-                    : view.mode === "merge" && view.sourceKind === "commit"
-                      ? String(view.sourceId)
-                      : null
-              }
-              currentSaveId={
-                view.mode === "workspace"
-                  ? String(view.workspaceId)
-                  : view.mode === "merge" && view.sourceKind === "workspace"
+          <DocumentWorkspaceGraphPanel
+            graphData={graphData}
+            mainBranch={graphMainBranch}
+            isInitialLoading={isInitialLoading}
+            hasError={Boolean(graphQuery.error)}
+            currentBranchId={view.branchId}
+            currentCommitId={
+              view.mode === "commit"
+                ? String(view.commitId)
+                : view.mode === "compare" && view.baseKind === "commit"
+                  ? String(view.baseId)
+                  : view.mode === "merge" && view.sourceKind === "commit"
                     ? String(view.sourceId)
                     : null
-              }
-              onNodeMenuClick={handleGraphNodeMenuClick}
-              onBranchSelect={(branchId) => {
-                openWorkspaceByBranch(branchId)
-                const branch = branches.find((item) => item.id === branchId)
-                if (branch) {
-                  setToast(`${branch.name} 작업장을 열었습니다.`)
-                }
-              }}
-              onBranchDelete={(branchId) => setDeleteDialog({ type: "branch", branchId })}
-              onBranchRename={handleBranchRename}
-              compareSelection={
-                view.mode === "compare"
-                  ? {
-                      active: true,
-                      baseKind: view.baseKind,
-                      baseId: view.baseId,
-                    }
+            }
+            currentSaveId={
+              view.mode === "workspace"
+                ? String(view.workspaceId)
+                : view.mode === "merge" && view.sourceKind === "workspace"
+                  ? String(view.sourceId)
                   : null
+            }
+            onNodeMenuClick={handleGraphNodeMenuClick}
+            onBranchSelect={(branchId) => {
+              openWorkspaceByBranch(branchId)
+              const branch = branches.find((item) => item.id === branchId)
+              if (branch) {
+                setToast(`${branch.name} 작업장을 열었습니다.`)
               }
-              mergeSelection={
-                view.mode === "merge"
-                  ? {
-                      active: true,
-                      sourceKind: view.sourceKind,
-                      sourceId: view.sourceId,
-                    }
-                  : null
-              }
-              onCompareTargetPick={handleCompareTargetPick}
-              onMergeTargetPick={handleMergeTargetPick}
-            />
-          </div>
+            }}
+            onBranchDelete={(branchId) => setDeleteDialog({ type: "branch", branchId })}
+            onBranchRename={handleBranchRename}
+            compareSelection={
+              view.mode === "compare"
+                ? {
+                    active: true,
+                    baseKind: view.baseKind,
+                    baseId: view.baseId,
+                  }
+                : null
+            }
+            mergeSelection={
+              view.mode === "merge"
+                ? {
+                    active: true,
+                    sourceKind: view.sourceKind,
+                    sourceId: view.sourceId,
+                  }
+                : null
+            }
+            onCompareTargetPick={handleCompareTargetPick}
+            onMergeTargetPick={handleMergeTargetPick}
+          />
 
           <div className="h-full min-h-0 bg-slate-100 p-3">
             <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -1862,8 +2325,10 @@ export default function DocumentWorkspacePage({
                 ) : view.mode === "merge" ? (
                   mergeSourceData &&
                   mergeTargetData &&
-                  mergeSourceItem?.loaded &&
-                  mergeTargetItem?.loaded ? (
+                  (demoMode ||
+                    !isRealDocument ||
+                    (!mergeSourceSnapshotQuery.isLoading &&
+                      !mergeTargetSnapshotQuery.isLoading)) ? (
                     <div className="h-full min-h-[760px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                       <DocumentMergeView
                         baseData={mergeSourceData}
@@ -1890,11 +2355,15 @@ export default function DocumentWorkspacePage({
                   )
                 ) : compareTargetItem &&
                   compareBaseItem &&
-                  compareBaseItem.loaded &&
-                  compareTargetItem.loaded ? (
+                  compareBaseData &&
+                  compareTargetData &&
+                  (demoMode ||
+                    !isRealDocument ||
+                    (!compareBaseSnapshotQuery.isLoading &&
+                      !compareTargetSnapshotQuery.isLoading)) ? (
                   <DocumentCompareView
-                    leftData={createOutputData(compareBaseItem.blocks)}
-                    rightData={createOutputData(compareTargetItem.blocks)}
+                    leftData={compareBaseData}
+                    rightData={compareTargetData}
                     leftLabel={compareBaseItem.title}
                     leftSubtitle={compareBaseItem.subtitle}
                     rightLabel={compareTargetItem.title}

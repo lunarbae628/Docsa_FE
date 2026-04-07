@@ -6,7 +6,6 @@ import DocumentsPage from "@/pages/DocumentsPage"
 import LoginPage from "@/pages/LoginPage"
 import MergePage from "@/pages/MergePage"
 import SignupPage from "@/pages/SignupPage"
-import WorkingSaveDemoPage from "@/pages/WorkingSaveDemoPage"
 import LandingConceptDemoPage from "@/pages/LandingConceptDemoPage"
 import PageLayout from "../layouts/PageLayout"
 
@@ -15,10 +14,6 @@ export const Router = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingConceptDemoPage />} />
-        <Route
-          path="/demo/working-save-flow"
-          element={<WorkingSaveDemoPage demoMode />}
-        />
         <Route path="/demo/landing-concept" element={<LandingConceptDemoPage />} />
         <Route element={<PageLayout />}>
           <Route path="/signup" element={<SignupPage />} />

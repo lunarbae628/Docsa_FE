@@ -26,7 +26,7 @@ export default function MergePage() {
   } = useQuery({
     queryKey: ["compareMergeCommit", documentId, baseCommitId, targetCommitId],
     queryFn: async () => {
-      const response = await apiClient.commit.compareMergeCommit({
+      const response = await apiClient.merge.compare({
         docId: Number(documentId),
         base: Number(baseCommitId),
         target: Number(targetCommitId),
@@ -39,11 +39,10 @@ export default function MergePage() {
     mutationFn: async (mergedData: OutputData) => {
       const content = mergedData.blocks
 
-      const response = await apiClient.commit.mergeCommit({
+      const response = await apiClient.merge.merge({
         docId: Number(documentId),
-        mergeCommitRequest: {
-          title: `Merge commit from ${baseCommitId} to ${targetCommitId}`,
-          description: "Merged using document merge tool",
+        mergeRequest: {
+          branchName: `merge-${baseCommitId}-${targetCommitId}`,
           baseCommitId: Number(baseCommitId),
           targetCommitId: Number(targetCommitId),
           content,

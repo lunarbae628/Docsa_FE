@@ -15,10 +15,12 @@ function transformDocListSimpleResponse(apiDoc: DocListSimpleResponse) {
     title: apiDoc.title || "제목 없음",
     createdAt: apiDoc.createdAt || new Date().toISOString(),
     updatedAt: apiDoc.updatedAt || new Date().toISOString(),
-    recent: {
-      recentType: apiDoc.recent?.recentType || "SAVE",
-      recentTypeId: apiDoc.recent?.recentTypeId || 0,
-    },
+    recent: apiDoc.recent
+      ? {
+          recentType: apiDoc.recent.recentType,
+          recentTypeId: apiDoc.recent.recentTypeId,
+        }
+      : undefined,
   }
 }
 

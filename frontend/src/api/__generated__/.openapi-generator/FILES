@@ -2,6 +2,7 @@ apis/AuthApi.ts
 apis/BranchAPIApi.ts
 apis/CommitAPIApi.ts
 apis/DocumentAPIApi.ts
+apis/MergeAPIApi.ts
 apis/SaveAPIApi.ts
 apis/UserAPIApi.ts
 apis/index.ts
@@ -15,7 +16,7 @@ models/CodeCheckRequest.ts
 models/CodeCheckResponse.ts
 models/CommitGraphDto.ts
 models/CommitResponse.ts
-models/CompareMergeCommitResponse.ts
+models/CompareMergeResponse.ts
 models/CreateCommitRequest.ts
 models/CreateCommitResponse.ts
 models/DocCreateResponse.ts
@@ -23,7 +24,8 @@ models/DocTitleRequest.ts
 models/EdgeDto.ts
 models/ErrorResponse.ts
 models/GraphResponse.ts
-models/MergeCommitRequest.ts
+models/MergeRequest.ts
+models/MergeResponse.ts
 models/PasswordResetRequest.ts
 models/PwdResetCodeRequest.ts
 models/SaveGetResponse.ts

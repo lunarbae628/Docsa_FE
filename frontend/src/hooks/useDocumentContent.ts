@@ -46,6 +46,30 @@ export function useDocumentContent({
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!documentId) {
+        setIsLoading(false)
+        setError(null)
+        return
+      }
+
+      if (documentMode === "save" && !saveId) {
+        setIsLoading(false)
+        setError(null)
+        return
+      }
+
+      if (documentMode === "commit" && !commitId) {
+        setIsLoading(false)
+        setError(null)
+        return
+      }
+
+      if (documentMode === "compare" && (!commitId || !compareId)) {
+        setIsLoading(false)
+        setError(null)
+        return
+      }
+
       setIsLoading(true)
       setError(null)
 

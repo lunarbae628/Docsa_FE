@@ -26,10 +26,12 @@ export function useCreateDocument() {
 
       // 새 문서로 이동 (임시 저장 모드로)
       const newDocumentId = response.id
+      const nextUrl =
+        response.saveId != null
+          ? `/documents/${newDocumentId}?mode=save&saveId=${response.saveId}`
+          : `/documents/${newDocumentId}`
 
-      navigate(
-        `/documents/${newDocumentId}?mode=save&saveId=${response.saveId}`,
-      )
+      navigate(nextUrl)
 
       console.log("새 문서 생성됨:", response)
     },

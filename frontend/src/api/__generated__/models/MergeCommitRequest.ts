@@ -13,20 +13,18 @@
  */
 
 import { mapValues } from '../runtime';
-import type { BlockDto } from './BlockDto';
-import {
-    BlockDtoFromJSON,
-    BlockDtoFromJSONTyped,
-    BlockDtoToJSON,
-    BlockDtoToJSONTyped,
-} from './BlockDto';
-
 /**
  * 
  * @export
  * @interface MergeCommitRequest
  */
 export interface MergeCommitRequest {
+    /**
+     * 
+     * @type {string}
+     * @memberof MergeCommitRequest
+     */
+    branchName: string;
     /**
      * 
      * @type {string}
@@ -53,16 +51,17 @@ export interface MergeCommitRequest {
     targetCommitId?: number;
     /**
      * 
-     * @type {Array<BlockDto>}
+     * @type {Array<{ [key: string]: any; }>}
      * @memberof MergeCommitRequest
      */
-    content?: Array<BlockDto>;
+    content?: Array<{ [key: string]: any; }>;
 }
 
 /**
  * Check if a given object implements the MergeCommitRequest interface.
  */
 export function instanceOfMergeCommitRequest(value: object): value is MergeCommitRequest {
+    if (!('branchName' in value) || value['branchName'] === undefined) return false;
     if (!('title' in value) || value['title'] === undefined) return false;
     return true;
 }
@@ -77,11 +76,12 @@ export function MergeCommitRequestFromJSONTyped(json: any, ignoreDiscriminator: 
     }
     return {
         
+        'branchName': json['branchName'],
         'title': json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'baseCommitId': json['baseCommitId'] == null ? undefined : json['baseCommitId'],
         'targetCommitId': json['targetCommitId'] == null ? undefined : json['targetCommitId'],
-        'content': json['content'] == null ? undefined : ((json['content'] as Array<any>).map(BlockDtoFromJSON)),
+        'content': json['content'] == null ? undefined : json['content'],
     };
 }
 
@@ -96,11 +96,12 @@ export function MergeCommitRequestToJSONTyped(value?: MergeCommitRequest | null,
 
     return {
         
+        'branchName': value['branchName'],
         'title': value['title'],
         'description': value['description'],
         'baseCommitId': value['baseCommitId'],
         'targetCommitId': value['targetCommitId'],
-        'content': value['content'] == null ? undefined : ((value['content'] as Array<any>).map(BlockDtoToJSON)),
+        'content': value['content'],
     };
 }
 

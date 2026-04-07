@@ -32,6 +32,7 @@ export function useGraphData({ documentId }: UseGraphDataProps) {
       return transformApiResponseToGraphData(response)
     },
     enabled: !!documentId,
+    refetchOnMount: "always",
   })
 }
 

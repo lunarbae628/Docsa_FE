@@ -37,10 +37,7 @@ export default function MergePage() {
 
   const mergeMutation = useMutation({
     mutationFn: async (mergedData: OutputData) => {
-      // OutputData의 blocks를 BlockDto 형태로 변환
-      const content = mergedData.blocks.map((block) => ({
-        data: block,
-      }))
+      const content = mergedData.blocks
 
       const response = await apiClient.commit.mergeCommit({
         docId: Number(documentId),

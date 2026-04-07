@@ -1,5 +1,5 @@
-import WorkingSaveDemoPage from "@/pages/WorkingSaveDemoPage"
+import DocumentWorkspacePage from "@/pages/DocumentWorkspacePage"
 
 export default function DocumentDetailPage() {
-  return <WorkingSaveDemoPage />
+  return <DocumentWorkspacePage />
 }

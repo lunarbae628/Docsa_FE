@@ -15,7 +15,10 @@ export const Router = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingConceptDemoPage />} />
-        <Route path="/demo/working-save-flow" element={<WorkingSaveDemoPage />} />
+        <Route
+          path="/demo/working-save-flow"
+          element={<WorkingSaveDemoPage demoMode />}
+        />
         <Route path="/demo/landing-concept" element={<LandingConceptDemoPage />} />
         <Route element={<PageLayout />}>
           <Route path="/signup" element={<SignupPage />} />

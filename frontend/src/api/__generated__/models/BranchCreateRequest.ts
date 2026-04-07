@@ -30,7 +30,7 @@ export interface BranchCreateRequest {
      * @type {number}
      * @memberof BranchCreateRequest
      */
-    fromCommitId?: number;
+    fromCommitId: number;
 }
 
 /**
@@ -38,6 +38,7 @@ export interface BranchCreateRequest {
  */
 export function instanceOfBranchCreateRequest(value: object): value is BranchCreateRequest {
     if (!('name' in value) || value['name'] === undefined) return false;
+    if (!('fromCommitId' in value) || value['fromCommitId'] === undefined) return false;
     return true;
 }
 
@@ -52,7 +53,7 @@ export function BranchCreateRequestFromJSONTyped(json: any, ignoreDiscriminator:
     return {
         
         'name': json['name'],
-        'fromCommitId': json['fromCommitId'] == null ? undefined : json['fromCommitId'],
+        'fromCommitId': json['fromCommitId'],
     };
 }
 

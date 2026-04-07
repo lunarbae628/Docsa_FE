@@ -13,7 +13,7 @@
  */
 
 
-export const BASE_PATH = "https://api.docsa.o-r.kr".replace(/\/+$/, "");
+export const BASE_PATH = "http://localhost:8080".replace(/\/+$/, "");
 
 export interface ConfigurationParameters {
     basePath?: string; // override base path
@@ -137,23 +137,8 @@ export class BaseAPI {
         if (response && (response.status >= 200 && response.status < 300)) {
             return response;
         }
-            // 💡 여기서부터 수정 시작
-        let errorMessage = 'Response returned an error code';
-        
-        // 백엔드에서 온 에러 메시지가 있는지 확인
-        if (response) {
-            try {
-                // 에러 응답 바디를 텍스트로 읽어서 JSON 파싱 시도
-                const errorData = await response.json();
-                errorMessage = errorData.message || errorMessage;
-            } catch (e) {
-                // JSON이 아니거나 메시지가 없으면 기본값 유지
-            }
-        }
-
-        // 이제 'Response returned...' 대신 실제 메시지를 던집니다.
-        throw new ResponseError(response, errorMessage);
-        }
+        throw new ResponseError(response, 'Response returned an error code');
+    }
 
     private async createFetchParams(context: RequestOpts, initOverrides?: RequestInit | InitOverrideFunction) {
         let url = this.configuration.basePath + context.path;

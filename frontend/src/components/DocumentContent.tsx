@@ -54,7 +54,6 @@ export default function DocumentContent({
     isOpen: boolean
     mode: "save" | "commit"
   }>({ isOpen: false, mode: "save" })
-  const [isContinuingAfterCommit, setIsContinuingAfterCommit] = useState(false)
   const [markdownModal, setMarkdownModal] = useState<{
     open: boolean
     mode: "import" | "export"
@@ -160,7 +159,7 @@ export default function DocumentContent({
         createCommitRequest: {
           title,
           description,
-          blocks: blocks.map((block) => ({ data: block })),
+          blocks,
           blockOrders: blockOrders,
           branchId,
         },
@@ -298,32 +297,12 @@ export default function DocumentContent({
         throw new Error("기록 ID가 없습니다")
       }
 
-      try {
-        setIsContinuingAfterCommit(true)
-        const continueResult = await apiClient.branch.createBranchOrSave({
-          documentId,
-          branchCreateRequest: {
-            name: branchName,
-            fromCommitId: res.id,
-          },
-        })
-
-        if (!continueResult.saveId) {
-          throw new Error("이어서 작업할 저장을 생성하지 못했습니다")
-        }
-
-        navigate(`/documents/${documentId}?mode=save&saveId=${continueResult.saveId}`)
-      } catch (error: any) {
-        console.error("커밋 후 이어서 작업 생성 실패:", error)
-
-        const errorMessage =
-          error.message || "기록은 완료됐지만 이어서 작업 상태를 만들지 못했습니다."
-
-        await alertDialog(errorMessage, "오류", "destructive")
+      if (!saveId) {
         navigate(`/documents/${documentId}?mode=commit&commitId=${res.id}`)
-      } finally {
-        setIsContinuingAfterCommit(false)
+        return
       }
+
+      navigate(`/documents/${documentId}?mode=save&saveId=${saveId}`)
     }
   }
 
@@ -346,9 +325,7 @@ export default function DocumentContent({
         onClose={() => setModalState({ isOpen: false, mode: "save" })}
         onConfirm={handleModalConfirm}
         isLoading={
-          saveMutation.isPending ||
-          commitMutation.isPending ||
-          isContinuingAfterCommit
+          saveMutation.isPending || commitMutation.isPending
         }
       />
       <Dialog

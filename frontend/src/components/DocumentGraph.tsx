@@ -251,8 +251,8 @@ export default function DocumentGraph({
 
   return (
     <div className="relative h-full w-full">
-      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-slate-200/90 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)] px-5 py-4">
           <div>
             <div className="text-base font-semibold tracking-[-0.03em] text-slate-900">
               작업 흐름
@@ -276,7 +276,7 @@ export default function DocumentGraph({
           onBranchRename={onBranchRename}
         />
 
-        <div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)]">
+        <div className="min-h-0 flex-1 bg-[radial-gradient(circle_at_top,#f9fbff_0%,#f8fafc_45%,#f5f7fb_100%)]">
           <style>{`
             .doc-graph-flow,
             .doc-graph-flow .react-flow__container,
@@ -290,6 +290,22 @@ export default function DocumentGraph({
             .doc-graph-flow .react-flow__node,
             .doc-graph-flow .react-flow__node * {
               cursor: pointer !important;
+            }
+            .doc-graph-flow .react-flow__controls {
+              box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12) !important;
+              border-radius: 18px !important;
+              overflow: hidden !important;
+              border: 1px solid #e2e8f0 !important;
+            }
+            .doc-graph-flow .react-flow__controls-button {
+              background: rgba(255,255,255,0.98) !important;
+              border-bottom: 1px solid #e2e8f0 !important;
+            }
+            .doc-graph-flow .react-flow__controls-button:last-child {
+              border-bottom: none !important;
+            }
+            .doc-graph-flow .react-flow__controls-button svg {
+              fill: #334155 !important;
             }
           `}</style>
           <ReactFlow
@@ -322,7 +338,7 @@ export default function DocumentGraph({
               size={1.2}
               color="#e2e8f0"
             />
-            <Controls className="!shadow-none [&_button]:!h-9 [&_button]:!w-9 [&_button]:!border-slate-200 [&_button]:!bg-white [&_button]:!text-slate-700 [&_button:hover]:!bg-slate-50" />
+            <Controls className="[&_button]:!h-9 [&_button]:!w-9 [&_button]:!text-slate-700 [&_button:hover]:!bg-slate-50" />
           </ReactFlow>
         </div>
       </div>

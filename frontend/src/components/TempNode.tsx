@@ -40,22 +40,26 @@ const TempNode = React.memo(function TempNode({
       <Handle type="source" position={Position.Bottom} style={HANDLE_STYLE} />
 
       <div
-        className={`nodrag nopan w-[220px] rounded-[22px] border bg-white p-4 text-left shadow-[0_16px_34px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.12)] ${
+        className={`nodrag nopan w-[228px] rounded-[24px] border bg-white px-4 py-3.5 text-left shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-colors ${
           isCurrentTemp
-            ? "border-slate-900 ring-4 ring-amber-100"
+            ? "border-amber-400 bg-amber-50/50 ring-4 ring-amber-100"
             : "border-slate-200 hover:border-slate-300"
         }`}
       >
+        <div
+          className="mb-3 h-1.5 w-12 rounded-full"
+          style={{ backgroundColor: color }}
+        />
         <div className="flex items-start gap-3">
           <div
-            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: `${color}16`, color }}
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border"
+            style={{ backgroundColor: `${color}12`, color, borderColor: `${color}24` }}
           >
-            <FilePenLine className="h-5 w-5" />
+            <FilePenLine className="h-4.5 w-4.5" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold tracking-[-0.03em] text-slate-900">
+              <span className="text-[15px] font-semibold tracking-[-0.03em] text-slate-900">
                 편집중
               </span>
               <span
@@ -65,10 +69,10 @@ const TempNode = React.memo(function TempNode({
                 워크스페이스
               </span>
             </div>
-            <div className="mt-1 text-sm text-slate-500">
+            <div className="mt-1 text-[13px] text-slate-500">
               아직 기록되지 않은 변경사항
             </div>
-            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
+            <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400">
               <Sparkles className="h-3.5 w-3.5" />
               클릭해서 이어서 편집
             </div>

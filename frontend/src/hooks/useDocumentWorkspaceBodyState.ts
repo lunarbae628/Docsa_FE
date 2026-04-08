@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { OutputData } from "@editorjs/editorjs"
 import type { UseQueryResult } from "@tanstack/react-query"
 import type { SetURLSearchParams } from "react-router"
-import { apiClient } from "@/api/apiClient"
 import type { GraphDataType } from "@/types/graph"
 import { editorDataToMarkdown } from "@/lib/editorMarkdown"
 
@@ -262,8 +261,6 @@ export function useDocumentWorkspaceBodyState({
   )
   const [isHydrating, setIsHydrating] = useState(false)
   const [hasBootstrapped, setHasBootstrapped] = useState(false)
-  const loadingCommitIdsRef = useRef<Set<number>>(new Set())
-  const loadingWorkspaceIdsRef = useRef<Set<number>>(new Set())
   const commitsRef = useRef<CommitRecord[]>([])
   const workspacesRef = useRef<WorkspaceRecord[]>([])
   const previousDocumentIdRef = useRef<number | null>(null)
@@ -508,126 +505,6 @@ export function useDocumentWorkspaceBodyState({
     const nextView = resolveViewFromParams(searchParams, branches, commits, workspaces)
     setView((prev) => (isSameView(prev, nextView) ? prev : nextView))
   }, [branches, commits, isRealDocument, searchParams, workspaces])
-
-  const loadCommitContent = useCallback(
-    async (commitId: number) => {
-      if (!isRealDocument || !commitId) return
-
-      const existing = commitsRef.current.find((item) => item.id === commitId)
-      if (existing?.loaded || loadingCommitIdsRef.current.has(commitId)) return
-
-      loadingCommitIdsRef.current.add(commitId)
-
-      try {
-        const response = await apiClient.commit.getCommit({ docId: documentId, commitId })
-        const nextBlocks = (response.content ?? []) as SnapshotBlock[]
-
-        setCommits((prev) => {
-          const nextContent = blocksToMarkdown(nextBlocks)
-          const existing = prev.find((commit) => commit.id === commitId)
-
-          if (!existing) {
-            return [
-              ...prev,
-              {
-                id: commitId,
-                branchId: 0,
-                title: `기록 ${commitId}`,
-                description: "",
-                content: nextContent,
-                blocks: nextBlocks,
-                createdAt: new Date().toISOString(),
-                kind: "commit",
-                loaded: true,
-              },
-            ]
-          }
-
-          return prev.map((commit) =>
-            commit.id === commitId
-              ? { ...commit, blocks: nextBlocks, content: nextContent, loaded: true }
-              : commit,
-          )
-        })
-      } finally {
-        loadingCommitIdsRef.current.delete(commitId)
-      }
-    },
-    [documentId, isRealDocument],
-  )
-
-  const loadWorkspaceContent = useCallback(
-    async (workspaceId: number) => {
-      if (!isRealDocument || !workspaceId) return
-
-      const existing = workspacesRef.current.find((item) => item.id === workspaceId)
-      if (existing?.loaded || loadingWorkspaceIdsRef.current.has(workspaceId)) return
-
-      loadingWorkspaceIdsRef.current.add(workspaceId)
-
-      try {
-        const response = await apiClient.save.getSave({ docId: documentId, saveId: workspaceId })
-        const nextBlocks = (response.content ?? []) as SnapshotBlock[]
-
-        setWorkspaces((prev) => {
-          const nextContent = blocksToMarkdown(nextBlocks)
-          const existing = prev.find((workspace) => workspace.id === workspaceId)
-
-          if (!existing) {
-            return [
-              ...prev,
-              {
-                id: workspaceId,
-                branchId: 0,
-                content: nextContent,
-                blocks: nextBlocks,
-                loaded: true,
-              },
-            ]
-          }
-
-          return prev.map((workspace) =>
-            workspace.id === workspaceId
-              ? { ...workspace, blocks: nextBlocks, content: nextContent, loaded: true }
-              : workspace,
-          )
-        })
-      } finally {
-        loadingWorkspaceIdsRef.current.delete(workspaceId)
-      }
-    },
-    [documentId, isRealDocument],
-  )
-
-  useEffect(() => {
-    if (!isRealDocument) return
-
-    const isDirectRequestedWorkspace =
-      requestedDocumentMode === "save" && requestedSaveId > 0
-    const isDirectRequestedCommit =
-      requestedDocumentMode === "commit" && requestedCommitId > 0
-
-    if (view.mode === "workspace" && view.workspaceId) {
-      if (!(isDirectRequestedWorkspace && view.workspaceId === requestedSaveId)) {
-        void loadWorkspaceContent(view.workspaceId)
-      }
-      return
-    }
-
-    if (view.mode === "commit" && view.commitId) {
-      if (!(isDirectRequestedCommit && view.commitId === requestedCommitId)) {
-        void loadCommitContent(view.commitId)
-      }
-    }
-  }, [
-    isRealDocument,
-    loadCommitContent,
-    loadWorkspaceContent,
-    requestedCommitId,
-    requestedDocumentMode,
-    requestedSaveId,
-    view,
-  ])
 
   useEffect(() => {
     const previousDocumentId = previousDocumentIdRef.current

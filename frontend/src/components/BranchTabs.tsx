@@ -149,7 +149,7 @@ export default function BranchTabs({
 
   return (
     <>
-      <div className="border-b border-slate-200 bg-white px-4 py-3">
+      <div className="border-b border-slate-200/90 bg-white/80 px-4 py-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <GitBranch className="h-4 w-4 text-slate-500" />
           <span className="text-sm font-medium text-slate-700">브랜치</span>
@@ -158,7 +158,7 @@ export default function BranchTabs({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex h-10 min-w-[200px] items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white"
+                  className="flex h-11 min-w-[220px] items-center gap-2 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fdfefe_0%,#f8fafc_100%)] px-3.5 text-sm text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.06)] transition hover:border-slate-300"
                 >
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -179,7 +179,10 @@ export default function BranchTabs({
                   <ChevronDown className="h-4 w-4 text-slate-400" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[260px]">
+              <DropdownMenuContent
+                align="end"
+                className="w-[260px] rounded-2xl border-slate-200 p-2 shadow-[0_16px_40px_rgba(15,23,42,0.12)]"
+              >
                 {branches.map((branch) => {
                   const isActive = branch.id === currentBranchId
                   const commitCount = getBranchCommitCount(branch.id)
@@ -191,7 +194,7 @@ export default function BranchTabs({
                     <DropdownMenuItem
                       key={branch.id}
                       onClick={() => onBranchSelect?.(branch.id)}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 focus:bg-slate-50"
                     >
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"

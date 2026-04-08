@@ -123,6 +123,8 @@ export default function DocumentWorkspacePage() {
     toast,
     branchEditState,
     setBranchEditState,
+    mergeBranchState,
+    setMergeBranchState,
     deleteDialog,
     setDeleteDialog,
     isCommitModalOpen,
@@ -140,6 +142,7 @@ export default function DocumentWorkspacePage() {
     handleDeleteCommit,
     handleDeleteBranch,
     handleDirectMerge,
+    handleMergeBranchConfirm,
     handleGraphNodeMenuClick,
     handleBranchRename,
     dispose,
@@ -598,6 +601,16 @@ export default function DocumentWorkspacePage() {
         onConfirm={handleBranchEditConfirm}
         isLastCommit={branchEditState?.isLastCommit || false}
         defaultBranchName={branchEditState?.currentBranchName || ""}
+      />
+
+      <BranchEditModal
+        isOpen={!!mergeBranchState}
+        onClose={() => setMergeBranchState(null)}
+        onConfirm={handleMergeBranchConfirm}
+        isLoading={isActionPending}
+        defaultBranchName={mergeBranchState?.suggestedName || ""}
+        title="병합 결과를 저장할 브랜치 이름"
+        submitLabel="병합 작업장 만들기"
       />
 
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>

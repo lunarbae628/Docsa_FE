@@ -63,43 +63,47 @@ const CommitNode = React.memo(function CommitNode({
       <Handle type="source" position={Position.Bottom} style={HANDLE_STYLE} />
 
       <div
-        className={`nodrag nopan group relative w-[220px] rounded-[22px] ${
-          isCurrentCommit ? "ring-4 ring-slate-200" : ""
+        className={`nodrag nopan group relative w-[228px] rounded-[24px] ${
+          isCurrentCommit ? "ring-4 ring-sky-100" : ""
         }`}
         onMouseEnter={(e) => {
           const rect = e.currentTarget.getBoundingClientRect()
           setHoveredCommit({
             commit,
             position: {
-              x: rect.left + rect.width / 2 - 140,
-              y: rect.bottom + 12,
+              x: rect.left + rect.width / 2,
+              y: rect.top - 10,
             },
           })
         }}
         onMouseLeave={() => setHoveredCommit(null)}
       >
         <div
-          className={`w-full rounded-[22px] border bg-white p-4 text-left shadow-[0_16px_34px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.12)] ${
+          className={`w-full rounded-[24px] border bg-white px-4 py-3.5 text-left shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-colors ${
             isCurrentCommit
-              ? "border-slate-900"
-              : "border-slate-200 hover:border-slate-300"
+              ? "border-sky-500 bg-sky-50/40"
+              : "border-slate-200 group-hover:border-slate-300"
           }`}
         >
+          <div
+            className="mb-3 h-1.5 w-12 rounded-full"
+            style={{ backgroundColor: color }}
+          />
           <div className="flex items-start gap-3">
           <div
-            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: `${color}18`, color }}
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border"
+            style={{ backgroundColor: `${color}12`, color, borderColor: `${color}26` }}
           >
-            <GitCommitHorizontal className="h-5 w-5" />
+            <GitCommitHorizontal className="h-4.5 w-4.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-lg font-semibold tracking-[-0.03em] text-slate-900">
+            <div className="truncate text-[15px] font-semibold tracking-[-0.03em] text-slate-900">
               {commit.title}
             </div>
-            <div className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
+            <div className="mt-1 line-clamp-2 text-[13px] leading-5 text-slate-500">
               {commit.description || "기록된 변경사항"}
             </div>
-            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
+            <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400">
               <Clock3 className="h-3.5 w-3.5" />
               {formatDateLabel(commit.createdAt)}
             </div>

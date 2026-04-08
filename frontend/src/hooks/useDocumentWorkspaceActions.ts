@@ -31,6 +31,11 @@ export type DeleteDialogState =
   | { type: "branch"; branchId: number }
   | null
 
+type MergeBranchState = {
+  mergedData: OutputData
+  suggestedName: string
+} | null
+
 function toBranchSlug(value: string) {
   return value
     .toLowerCase()
@@ -227,6 +232,7 @@ export function useDocumentWorkspaceActions({
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced")
   const [toast, setToast] = useState("작업장에서 문서를 편집 중입니다.")
   const [branchEditState, setBranchEditState] = useState<BranchEditState>(null)
+  const [mergeBranchState, setMergeBranchState] = useState<MergeBranchState>(null)
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null)
   const [isCommitModalOpen, setIsCommitModalOpen] = useState(false)
   const [isActionPending, setIsActionPending] = useState(false)
@@ -584,8 +590,8 @@ export function useDocumentWorkspaceActions({
     ],
   )
 
-  const handleDirectMerge = useCallback(
-    async (mergedData: OutputData) => {
+  const commitMergeWorkspace = useCallback(
+    async (mergedData: OutputData, mergeBranchName: string) => {
       const sourceItem = view.mode === "merge" ? mergeSourceItem : null
       if (!sourceItem || !mergeTargetItem || !isRealDocument) return
 
@@ -600,12 +606,6 @@ export function useDocumentWorkspaceActions({
         view.targetKind && view.targetId
           ? resolveCommitId(view.targetKind, view.targetId)
           : null
-
-      const mergeBranchName = createUniqueBranchName(
-        sourceItem.title,
-        mergeTargetItem.title,
-        branches,
-      )
 
       if (!baseCommitId || !targetCommitId) {
         await alertDialog(
@@ -655,6 +655,7 @@ export function useDocumentWorkspaceActions({
         await refreshDocumentState(nextParams, false)
         setSearchParams(nextParams, { replace: true })
         setToast(`${mergeBranchName} 작업장을 새로 만들었습니다.`)
+        setMergeBranchState(null)
       } catch (error: any) {
         await alertDialog(
           error.message || "병합 적용에 실패했습니다.",
@@ -676,6 +677,33 @@ export function useDocumentWorkspaceActions({
       setSearchParams,
       view,
     ],
+  )
+
+  const handleDirectMerge = useCallback(
+    async (mergedData: OutputData) => {
+      const sourceItem = view.mode === "merge" ? mergeSourceItem : null
+      if (!sourceItem || !mergeTargetItem) return
+
+      const suggestedName = createUniqueBranchName(
+        sourceItem.title,
+        mergeTargetItem.title,
+        branches,
+      )
+
+      setMergeBranchState({
+        mergedData,
+        suggestedName,
+      })
+    },
+    [branches, mergeSourceItem, mergeTargetItem, view.mode],
+  )
+
+  const handleMergeBranchConfirm = useCallback(
+    async (branchName: string) => {
+      if (!mergeBranchState) return
+      await commitMergeWorkspace(mergeBranchState.mergedData, branchName)
+    },
+    [commitMergeWorkspace, mergeBranchState],
   )
 
   const handleGraphNodeMenuClick = useCallback(
@@ -771,6 +799,8 @@ export function useDocumentWorkspaceActions({
     setToast,
     branchEditState,
     setBranchEditState,
+    mergeBranchState,
+    setMergeBranchState,
     deleteDialog,
     setDeleteDialog,
     isCommitModalOpen,
@@ -788,6 +818,7 @@ export function useDocumentWorkspaceActions({
     handleDeleteCommit,
     handleDeleteBranch,
     handleDirectMerge,
+    handleMergeBranchConfirm,
     handleGraphNodeMenuClick,
     handleBranchRename,
     dispose,

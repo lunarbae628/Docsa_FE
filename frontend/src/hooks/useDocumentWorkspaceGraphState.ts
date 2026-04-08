@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useGraphData } from "@/hooks/useGraphData"
 import type { GraphDataType } from "@/types/graph"
 
@@ -22,9 +22,11 @@ function hasRenderableGraphData(graphData: GraphDataType) {
 export function useDocumentWorkspaceGraphState(documentId: number) {
   const graphQuery = useGraphData({ documentId })
   const stableGraphDataRef = useRef<GraphDataType | null>(null)
+  const [graphData, setGraphData] = useState<GraphDataType>(createEmptyGraphData())
 
   useEffect(() => {
     stableGraphDataRef.current = null
+    setGraphData(createEmptyGraphData())
   }, [documentId])
 
   useEffect(() => {
@@ -33,18 +35,35 @@ export function useDocumentWorkspaceGraphState(documentId: number) {
       (hasRenderableGraphData(graphQuery.data) || !stableGraphDataRef.current)
     ) {
       stableGraphDataRef.current = graphQuery.data
+      setGraphData(graphQuery.data)
     }
   }, [graphQuery.data])
 
-  const graphData = useMemo(
-    () => stableGraphDataRef.current ?? graphQuery.data ?? createEmptyGraphData(),
+  const resolvedGraphData = useMemo(
+    () => graphData ?? stableGraphDataRef.current ?? graphQuery.data ?? createEmptyGraphData(),
+    [graphData, graphQuery.data],
+  )
+
+  const updateGraphData = useCallback(
+    (updater: (current: GraphDataType) => GraphDataType) => {
+      setGraphData((current) => {
+        const base =
+          current ??
+          stableGraphDataRef.current ??
+          graphQuery.data ??
+          createEmptyGraphData()
+        const next = updater(base)
+        stableGraphDataRef.current = next
+        return next
+      })
+    },
     [graphQuery.data],
   )
 
   const mainBranch = useMemo(
     () =>
-      graphData.branches.find((branch) => branch.name === "main") ??
-      graphData.branches[0] ??
+      resolvedGraphData.branches.find((branch) => branch.name === "main") ??
+      resolvedGraphData.branches[0] ??
       ({
         id: 0,
         name: "main",
@@ -55,7 +74,7 @@ export function useDocumentWorkspaceGraphState(documentId: number) {
         leafCommitId: null,
         saveId: null,
       } satisfies GraphDataType["branches"][number]),
-    [graphData.branches],
+    [resolvedGraphData.branches],
   )
 
   const isInitialLoading =
@@ -63,7 +82,8 @@ export function useDocumentWorkspaceGraphState(documentId: number) {
 
   return {
     graphQuery,
-    graphData,
+    graphData: resolvedGraphData,
+    updateGraphData,
     mainBranch,
     isInitialLoading,
   }

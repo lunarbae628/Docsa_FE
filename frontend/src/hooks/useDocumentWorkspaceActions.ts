@@ -136,6 +136,7 @@ function updateGraphCacheAfterCommitDelete(
   const branchCommits = remainingCommits
     .filter((commit) => commit.branchId === branchId)
     .sort((a, b) => a.id - b.id)
+  const nextRootCommitId = branchCommits[0]?.id ?? null
   const nextLeafCommitId = branchCommits[branchCommits.length - 1]?.id ?? null
 
   return {
@@ -145,7 +146,31 @@ function updateGraphCacheAfterCommitDelete(
       (edge) => edge.from !== commitId && edge.to !== commitId,
     ),
     branches: graphData.branches.map((branch) =>
-      branch.id === branchId ? { ...branch, leafCommitId: nextLeafCommitId } : branch,
+      branch.id === branchId
+        ? {
+            ...branch,
+            fromCommitId:
+              branch.fromCommitId === commitId ? null : branch.fromCommitId,
+            mergeTargetCommitId:
+              branch.mergeTargetCommitId === commitId
+                ? null
+                : branch.mergeTargetCommitId,
+            rootCommitId: nextRootCommitId,
+            leafCommitId: nextLeafCommitId,
+          }
+        : {
+            ...branch,
+            fromCommitId:
+              branch.fromCommitId === commitId ? null : branch.fromCommitId,
+            mergeTargetCommitId:
+              branch.mergeTargetCommitId === commitId
+                ? null
+                : branch.mergeTargetCommitId,
+            rootCommitId:
+              branch.rootCommitId === commitId ? null : branch.rootCommitId,
+            leafCommitId:
+              branch.leafCommitId === commitId ? null : branch.leafCommitId,
+          },
     ),
   }
 }
@@ -170,6 +195,48 @@ function updateGraphCacheAfterBranchDelete(
   }
 }
 
+function updateBranchRecordsAfterCommitDelete(
+  branches: BranchRecord[],
+  commits: CommitRecord[],
+  branchId: number,
+  commitId: number,
+) {
+  const remainingBranchCommits = commits
+    .filter((commit) => commit.branchId === branchId && commit.id !== commitId)
+    .sort((a, b) => a.id - b.id)
+
+  const nextRootCommitId = remainingBranchCommits[0]?.id ?? null
+  const nextHeadCommitId =
+    remainingBranchCommits[remainingBranchCommits.length - 1]?.id ?? null
+
+  return branches.map((branch) =>
+    branch.id === branchId
+      ? {
+          ...branch,
+          rootCommitId: nextRootCommitId,
+          headCommitId: nextHeadCommitId,
+        }
+      : branch,
+  )
+}
+
+function removeCommitRecord(commits: CommitRecord[], commitId: number) {
+  return commits.filter((commit) => commit.id !== commitId)
+}
+
+function removeBranchRecords(
+  branches: BranchRecord[],
+  commits: CommitRecord[],
+  workspaces: WorkspaceRecord[],
+  branchId: number,
+) {
+  return {
+    branches: branches.filter((branch) => branch.id !== branchId),
+    commits: commits.filter((commit) => commit.branchId !== branchId),
+    workspaces: workspaces.filter((workspace) => workspace.branchId !== branchId),
+  }
+}
+
 interface UseDocumentWorkspaceActionsParams {
   documentId: number
   isRealDocument: boolean
@@ -188,6 +255,7 @@ interface UseDocumentWorkspaceActionsParams {
   currentCommit: CommitRecord | null
   mainBranch: BranchRecord | null
   mainWorkspace: WorkspaceRecord | null
+  updateGraphData: (updater: (current: GraphDataType) => GraphDataType) => void
   mergeSourceItem: {
     kind: CompareItemKind
     id: number
@@ -223,6 +291,7 @@ export function useDocumentWorkspaceActions({
   currentCommit,
   mainBranch,
   mainWorkspace,
+  updateGraphData,
   mergeSourceItem,
   mergeTargetItem,
   refreshDocumentState,
@@ -243,8 +312,7 @@ export function useDocumentWorkspaceActions({
     view.mode === "commit" &&
       currentCommit &&
       currentBranch &&
-      currentBranch.headCommitId === currentCommit.id &&
-      currentBranch.rootCommitId !== currentCommit.id,
+      currentBranch.headCommitId === currentCommit.id,
   )
 
   const handleWorkspaceChange = useCallback(
@@ -313,18 +381,14 @@ export function useDocumentWorkspaceActions({
           throw new Error("기록 ID가 없습니다.")
         }
 
-        queryClient.setQueryData<GraphDataType>(
-          ["graphData", documentId],
-          (current) =>
-            current
-              ? updateGraphCacheAfterCommitCreate(current, currentBranch.id, {
-                  id: result.id,
-                  branchId: currentBranch.id,
-                  title,
-                  description: description || "",
-                  createdAt: new Date().toISOString(),
-                })
-              : current,
+        updateGraphData((current) =>
+          updateGraphCacheAfterCommitCreate(current, currentBranch.id, {
+            id: result.id,
+            branchId: currentBranch.id,
+            title,
+            description: description || "",
+            createdAt: new Date().toISOString(),
+          }),
         )
 
         setIsCommitModalOpen(false)
@@ -350,9 +414,9 @@ export function useDocumentWorkspaceActions({
       currentWorkspace,
       documentId,
       isRealDocument,
-      queryClient,
       refreshDocumentState,
       setSearchParams,
+      updateGraphData,
     ],
   )
 
@@ -399,21 +463,17 @@ export function useDocumentWorkspaceActions({
         }
 
         if (result.branchId) {
-          queryClient.setQueryData<GraphDataType>(
-            ["graphData", documentId],
-            (current) =>
-              current
-                ? updateGraphCacheAfterBranchCreate(current, {
-                    id: result.branchId,
-                    name: branchName,
-                    createdAt: new Date().toISOString(),
-                    fromCommitId: targetCommit.id,
-                    mergeTargetCommitId: null,
-                    rootCommitId: null,
-                    leafCommitId: null,
-                    saveId: result.saveId ?? null,
-                  })
-                : current,
+          updateGraphData((current) =>
+            updateGraphCacheAfterBranchCreate(current, {
+              id: result.branchId,
+              name: branchName,
+              createdAt: new Date().toISOString(),
+              fromCommitId: targetCommit.id,
+              mergeTargetCommitId: null,
+              rootCommitId: null,
+              leafCommitId: null,
+              saveId: result.saveId ?? null,
+            }),
           )
         }
 
@@ -439,9 +499,9 @@ export function useDocumentWorkspaceActions({
       commits,
       documentId,
       isRealDocument,
-      queryClient,
       refreshDocumentState,
       setSearchParams,
+      updateGraphData,
     ],
   )
 
@@ -527,15 +587,29 @@ export function useDocumentWorkspaceActions({
           docId: documentId,
           commitId,
         })
-        queryClient.setQueryData<GraphDataType>(
-          ["graphData", documentId],
-          (current) =>
-            current
-              ? updateGraphCacheAfterCommitDelete(current, targetBranch.id, commitId)
-              : current,
+        updateGraphData((current) =>
+          updateGraphCacheAfterCommitDelete(current, targetBranch.id, commitId),
+        )
+        setCommits((prev) => removeCommitRecord(prev, commitId))
+        setBranches((prev) =>
+          updateBranchRecordsAfterCommitDelete(prev, commits, targetBranch.id, commitId),
         )
         setDeleteDialog(null)
-        await refreshDocumentState(new URLSearchParams(), true)
+
+        const nextParams = targetBranch.saveId
+          ? new URLSearchParams({
+              mode: "save",
+              saveId: String(targetBranch.saveId),
+            })
+          : new URLSearchParams()
+
+        if (targetBranch.saveId) {
+          setSearchParams(nextParams, { replace: true })
+        }
+        void queryClient.refetchQueries({
+          queryKey: ["graphData", documentId],
+          type: "active",
+        })
         setToast(`기록 "${targetCommit.title}"을 삭제했습니다.`)
       } catch (error: any) {
         await alertDialog(
@@ -547,7 +621,16 @@ export function useDocumentWorkspaceActions({
         setIsActionPending(false)
       }
     },
-    [branches, commits, documentId, isRealDocument, queryClient, refreshDocumentState],
+    [
+      branches,
+      commits,
+      documentId,
+      isRealDocument,
+      setBranches,
+      setCommits,
+      setSearchParams,
+      updateGraphData,
+    ],
   )
 
   const handleDeleteBranch = useCallback(
@@ -563,13 +646,34 @@ export function useDocumentWorkspaceActions({
           documentId,
           branchId,
         })
-        queryClient.setQueryData<GraphDataType>(
-          ["graphData", documentId],
-          (current) =>
-            current ? updateGraphCacheAfterBranchDelete(current, branchId) : current,
+        updateGraphData((current) =>
+          updateGraphCacheAfterBranchDelete(current, branchId),
         )
+        const nextLocalState = removeBranchRecords(
+          branches,
+          commits,
+          workspaces,
+          branchId,
+        )
+        setBranches(nextLocalState.branches)
+        setCommits(nextLocalState.commits)
+        setWorkspaces(nextLocalState.workspaces)
         setDeleteDialog(null)
-        await refreshDocumentState(new URLSearchParams(), true)
+
+        const nextParams = mainWorkspace?.id
+          ? new URLSearchParams({
+              mode: "save",
+              saveId: String(mainWorkspace.id),
+            })
+          : new URLSearchParams()
+
+        if (mainWorkspace?.id) {
+          setSearchParams(nextParams, { replace: true })
+        }
+        void queryClient.refetchQueries({
+          queryKey: ["graphData", documentId],
+          type: "active",
+        })
         setToast(`${targetBranch.name} 브랜치를 삭제하고 main 작업장으로 돌아왔습니다.`)
       } catch (error: any) {
         await alertDialog(
@@ -583,12 +687,17 @@ export function useDocumentWorkspaceActions({
     },
     [
       branches,
+      commits,
       documentId,
       isRealDocument,
       mainBranch,
       mainWorkspace,
-      queryClient,
-      refreshDocumentState,
+      setBranches,
+      setCommits,
+      setSearchParams,
+      setWorkspaces,
+      updateGraphData,
+      workspaces,
     ],
   )
 
@@ -634,21 +743,17 @@ export function useDocumentWorkspaceActions({
           throw new Error("병합 작업장을 만들지 못했습니다.")
         }
 
-        queryClient.setQueryData<GraphDataType>(
-          ["graphData", documentId],
-          (current) =>
-            current
-              ? updateGraphCacheAfterBranchCreate(current, {
-                  id: mergeResult.branchId,
-                  name: mergeBranchName,
-                  createdAt: new Date().toISOString(),
-                  fromCommitId: baseCommitId,
-                  mergeTargetCommitId: targetCommitId,
-                  rootCommitId: null,
-                  leafCommitId: null,
-                  saveId: mergeResult.saveId ?? null,
-                })
-              : current,
+        updateGraphData((current) =>
+          updateGraphCacheAfterBranchCreate(current, {
+            id: mergeResult.branchId,
+            name: mergeBranchName,
+            createdAt: new Date().toISOString(),
+            fromCommitId: baseCommitId,
+            mergeTargetCommitId: targetCommitId,
+            rootCommitId: null,
+            leafCommitId: null,
+            saveId: mergeResult.saveId ?? null,
+          }),
         )
 
         const nextParams = new URLSearchParams({
@@ -675,9 +780,9 @@ export function useDocumentWorkspaceActions({
       isRealDocument,
       mergeSourceItem,
       mergeTargetItem,
-      queryClient,
       refreshDocumentState,
       setSearchParams,
+      updateGraphData,
       view,
     ],
   )
@@ -768,12 +873,8 @@ export function useDocumentWorkspaceActions({
             name: newName,
           },
         })
-        queryClient.setQueryData<GraphDataType>(
-          ["graphData", documentId],
-          (current) =>
-            current
-              ? updateGraphCacheAfterBranchRename(current, branchId, newName)
-              : current,
+        updateGraphData((current) =>
+          updateGraphCacheAfterBranchRename(current, branchId, newName),
         )
         await refreshDocumentState(searchParams, false)
         setToast(`${newName} 브랜치 이름으로 변경했습니다.`)
@@ -787,7 +888,7 @@ export function useDocumentWorkspaceActions({
         setIsActionPending(false)
       }
     },
-    [documentId, isRealDocument, queryClient, refreshDocumentState, searchParams],
+    [documentId, isRealDocument, refreshDocumentState, searchParams, updateGraphData],
   )
 
   const dispose = useCallback(() => {

@@ -46,7 +46,7 @@ export default function DocumentWorkspacePage() {
       ? requestedMode
       : null
 
-  const { graphQuery, graphData, mainBranch, isInitialLoading } =
+  const { graphQuery, graphData, updateGraphData, mainBranch, isInitialLoading } =
     useDocumentWorkspaceGraphState(documentId)
 
   const directSelectedContent = useDocumentContent({
@@ -164,6 +164,7 @@ export default function DocumentWorkspacePage() {
     currentCommit,
     mainBranch,
     mainWorkspace: derivedMainWorkspace,
+    updateGraphData,
     mergeSourceItem: mergeSourceItem
       ? {
           kind: mergeSourceItem.kind,

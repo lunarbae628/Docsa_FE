@@ -4,9 +4,9 @@ import type { GraphDataType, Commit, GraphNode } from "@/types/graph"
 import { getBranchColor, GRAPH_LAYOUT } from "@/lib/graphUtils"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "@/api/apiClient"
-import type { CommitGraphResponse } from "@/api/__generated__"
+import type { GraphResponse } from "@/api/__generated__"
 import type { CommitDto } from "@/api/__generated__/models/CommitDto"
-import type { BranchDto } from "@/api/__generated__/models/BranchDto"
+import type { BranchGraphDto } from "@/api/__generated__/models/BranchGraphDto"
 import type { EdgeDto } from "@/api/__generated__/models/EdgeDto"
 
 interface UseGraphRenderProps {
@@ -40,7 +40,7 @@ export function useGraphData({ documentId }: UseGraphDataProps) {
 
 // API 응답을 로컬 타입으로 변환하는 함수
 function transformApiResponseToGraphData(
-  response: CommitGraphResponse,
+  response: GraphResponse,
 ): GraphDataType {
   return {
     title: response.title || "",
@@ -60,12 +60,13 @@ function transformCommitDto(dto: CommitDto): Commit {
   }
 }
 
-function transformBranchDto(dto: BranchDto) {
+function transformBranchDto(dto: BranchGraphDto) {
   return {
     id: dto.id || 0,
     name: dto.name || "",
     createdAt: dto.createdAt?.toISOString() || new Date().toISOString(),
     fromCommitId: dto.fromCommitId ?? null,
+    mergeTargetCommitId: dto.mergeTargetCommitId ?? null,
     rootCommitId: dto.rootCommitId ?? null,
     leafCommitId: dto.leafCommitId ?? null,
     saveId: dto.saveId ?? null,
@@ -248,10 +249,17 @@ export function useGraphRender({
             branchIndex * GRAPH_LAYOUT.BRANCH_SPACING +
             GRAPH_LAYOUT.BASE_X_OFFSET
 
-          const parentDepth =
+          const parentDepths = [
             branch.fromCommitId != null
               ? commitDepths.get(branch.fromCommitId)
-              : undefined
+              : undefined,
+            branch.mergeTargetCommitId != null
+              ? commitDepths.get(branch.mergeTargetCommitId)
+              : undefined,
+          ].filter((depth): depth is number => depth != null)
+
+          const parentDepth =
+            parentDepths.length > 0 ? Math.max(...parentDepths) : undefined
           yPosition =
             parentDepth != null
               ? (parentDepth + 1) * GRAPH_LAYOUT.ROW_SPACING +
@@ -305,18 +313,25 @@ export function useGraphRender({
           })
         }
 
-        if (branch.leafCommitId == null && branch.fromCommitId != null) {
-          tempEdgesArray.push({
-            id: `temp-edge-${branch.id}`,
-            source: `commit-${branch.fromCommitId.toString()}`,
-            target: saveNodeId,
-            type: "timeline",
-            style: {
-              stroke: color,
-              strokeWidth: 2.5,
-            },
-            data: { dashed: true },
-          })
+        if (branch.leafCommitId == null) {
+          const originCommitIds = [
+            branch.fromCommitId,
+            branch.mergeTargetCommitId,
+          ].filter((commitId): commitId is number => commitId != null)
+
+          for (const originCommitId of [...new Set(originCommitIds)]) {
+            tempEdgesArray.push({
+              id: `temp-edge-${branch.id}-${originCommitId}`,
+              source: `commit-${originCommitId.toString()}`,
+              target: saveNodeId,
+              type: "timeline",
+              style: {
+                stroke: color,
+                strokeWidth: 2.5,
+              },
+              data: { dashed: true },
+            })
+          }
         }
       }
     }

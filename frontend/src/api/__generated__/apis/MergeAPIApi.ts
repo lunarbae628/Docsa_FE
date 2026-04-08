@@ -15,14 +15,11 @@
 
 import * as runtime from '../runtime';
 import type {
-  CompareMergeResponse,
   ErrorResponse,
   MergeRequest,
   MergeResponse,
 } from '../models/index';
 import {
-    CompareMergeResponseFromJSON,
-    CompareMergeResponseToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
     MergeRequestFromJSON,
@@ -30,12 +27,6 @@ import {
     MergeResponseFromJSON,
     MergeResponseToJSON,
 } from '../models/index';
-
-export interface CompareRequest {
-    docId: number;
-    base: number;
-    target: number;
-}
 
 export interface MergeOperationRequest {
     docId: number;
@@ -46,67 +37,6 @@ export interface MergeOperationRequest {
  * 
  */
 export class MergeAPIApi extends runtime.BaseAPI {
-
-    /**
-     * 유저가 소유한 문서에서 병합할 2개의 기록을 조회합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
-     * 병합할 2개의 기록을 조회합니다.
-     */
-    async compareRaw(requestParameters: CompareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CompareMergeResponse>> {
-        if (requestParameters['docId'] == null) {
-            throw new runtime.RequiredError(
-                'docId',
-                'Required parameter "docId" was null or undefined when calling compare().'
-            );
-        }
-
-        if (requestParameters['base'] == null) {
-            throw new runtime.RequiredError(
-                'base',
-                'Required parameter "base" was null or undefined when calling compare().'
-            );
-        }
-
-        if (requestParameters['target'] == null) {
-            throw new runtime.RequiredError(
-                'target',
-                'Required parameter "target" was null or undefined when calling compare().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        if (requestParameters['base'] != null) {
-            queryParameters['base'] = requestParameters['base'];
-        }
-
-        if (requestParameters['target'] != null) {
-            queryParameters['target'] = requestParameters['target'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/api/document/{docId}/merge`;
-        urlPath = urlPath.replace(`{${"docId"}}`, encodeURIComponent(String(requestParameters['docId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => CompareMergeResponseFromJSON(jsonValue));
-    }
-
-    /**
-     * 유저가 소유한 문서에서 병합할 2개의 기록을 조회합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
-     * 병합할 2개의 기록을 조회합니다.
-     */
-    async compare(requestParameters: CompareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CompareMergeResponse> {
-        const response = await this.compareRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
 
     /**
      * 유저가 소유한 문서에서 기준 커밋과 비교 커밋을 검토한 뒤, 병합 결과를 담은 새 브랜치와 작업장을 생성합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 

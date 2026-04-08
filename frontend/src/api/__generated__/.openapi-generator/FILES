@@ -16,7 +16,6 @@ models/CodeCheckRequest.ts
 models/CodeCheckResponse.ts
 models/CommitGraphDto.ts
 models/CommitResponse.ts
-models/CompareMergeResponse.ts
 models/CreateCommitRequest.ts
 models/CreateCommitResponse.ts
 models/DocCreateResponse.ts

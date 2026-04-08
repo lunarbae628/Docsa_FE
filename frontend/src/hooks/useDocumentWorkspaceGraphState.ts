@@ -50,6 +50,7 @@ export function useDocumentWorkspaceGraphState(documentId: number) {
         name: "main",
         createdAt: new Date().toISOString(),
         fromCommitId: null,
+        mergeTargetCommitId: null,
         rootCommitId: null,
         leafCommitId: null,
         saveId: null,

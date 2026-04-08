@@ -27,6 +27,7 @@ export interface Branch {
   name: string
   createdAt: string
   fromCommitId: number | null
+  mergeTargetCommitId: number | null
   rootCommitId: number | null
   leafCommitId: number | null
   saveId: number | null

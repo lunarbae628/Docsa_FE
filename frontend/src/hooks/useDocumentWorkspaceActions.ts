@@ -81,6 +81,7 @@ function updateGraphCacheAfterCommitCreate(
           ...branch,
           rootCommitId: branch.rootCommitId ?? commit.id,
           leafCommitId: commit.id,
+          mergeTargetCommitId: branch.mergeTargetCommitId ?? null,
         }
       : branch,
   )
@@ -407,6 +408,7 @@ export function useDocumentWorkspaceActions({
                     name: branchName,
                     createdAt: new Date().toISOString(),
                     fromCommitId: targetCommit.id,
+                    mergeTargetCommitId: null,
                     rootCommitId: null,
                     leafCommitId: null,
                     saveId: result.saveId ?? null,
@@ -640,7 +642,8 @@ export function useDocumentWorkspaceActions({
                   id: mergeResult.branchId,
                   name: mergeBranchName,
                   createdAt: new Date().toISOString(),
-                  fromCommitId: targetCommitId,
+                  fromCommitId: baseCommitId,
+                  mergeTargetCommitId: targetCommitId,
                   rootCommitId: null,
                   leafCommitId: null,
                   saveId: mergeResult.saveId ?? null,

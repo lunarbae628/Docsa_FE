@@ -14,49 +14,55 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ * 그래프 렌더링에 사용하는 브랜치 메타데이터
  * @export
  * @interface BranchGraphDto
  */
 export interface BranchGraphDto {
     /**
-     * 
+     * 브랜치 ID
      * @type {number}
      * @memberof BranchGraphDto
      */
     id?: number;
     /**
-     * 
+     * 브랜치 이름
      * @type {string}
      * @memberof BranchGraphDto
      */
     name?: string;
     /**
-     * 
+     * 브랜치 생성 시각
      * @type {Date}
      * @memberof BranchGraphDto
      */
     createdAt?: Date;
     /**
-     * 
+     * 브랜치의 기본 시작 커밋 ID
      * @type {number}
      * @memberof BranchGraphDto
      */
     fromCommitId?: number;
     /**
-     * 
+     * 머지 브랜치일 때 두 번째 기원 커밋 ID
+     * @type {number}
+     * @memberof BranchGraphDto
+     */
+    mergeTargetCommitId?: number;
+    /**
+     * 브랜치의 루트 커밋 ID
      * @type {number}
      * @memberof BranchGraphDto
      */
     rootCommitId?: number;
     /**
-     * 
+     * 브랜치의 현재 leaf 커밋 ID
      * @type {number}
      * @memberof BranchGraphDto
      */
     leafCommitId?: number;
     /**
-     * 
+     * 브랜치에 연결된 현재 작업장 ID
      * @type {number}
      * @memberof BranchGraphDto
      */
@@ -84,6 +90,7 @@ export function BranchGraphDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'name': json['name'] == null ? undefined : json['name'],
         'createdAt': json['createdAt'] == null ? undefined : (new Date(json['createdAt'])),
         'fromCommitId': json['fromCommitId'] == null ? undefined : json['fromCommitId'],
+        'mergeTargetCommitId': json['mergeTargetCommitId'] == null ? undefined : json['mergeTargetCommitId'],
         'rootCommitId': json['rootCommitId'] == null ? undefined : json['rootCommitId'],
         'leafCommitId': json['leafCommitId'] == null ? undefined : json['leafCommitId'],
         'saveId': json['saveId'] == null ? undefined : json['saveId'],
@@ -105,6 +112,7 @@ export function BranchGraphDtoToJSONTyped(value?: BranchGraphDto | null, ignoreD
         'name': value['name'],
         'createdAt': value['createdAt'] == null ? undefined : ((value['createdAt']).toISOString()),
         'fromCommitId': value['fromCommitId'],
+        'mergeTargetCommitId': value['mergeTargetCommitId'],
         'rootCommitId': value['rootCommitId'],
         'leafCommitId': value['leafCommitId'],
         'saveId': value['saveId'],

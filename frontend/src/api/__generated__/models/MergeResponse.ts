@@ -14,19 +14,19 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ * 병합 결과로 생성된 새 브랜치와 작업장 정보
  * @export
  * @interface MergeResponse
  */
 export interface MergeResponse {
     /**
-     * 
+     * 새로 생성된 병합 브랜치 ID
      * @type {number}
      * @memberof MergeResponse
      */
     branchId?: number;
     /**
-     * 
+     * 새 브랜치에 연결된 작업장 ID
      * @type {number}
      * @memberof MergeResponse
      */

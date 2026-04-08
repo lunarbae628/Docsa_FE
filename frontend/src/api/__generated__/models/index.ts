@@ -9,7 +9,6 @@ export * from './CodeCheckRequest';
 export * from './CodeCheckResponse';
 export * from './CommitGraphDto';
 export * from './CommitResponse';
-export * from './CompareMergeResponse';
 export * from './CreateCommitRequest';
 export * from './CreateCommitResponse';
 export * from './DocCreateResponse';

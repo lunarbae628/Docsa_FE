@@ -14,31 +14,31 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ * 병합 결과를 담은 새 브랜치 작업장 생성 요청
  * @export
  * @interface MergeRequest
  */
 export interface MergeRequest {
     /**
-     * 
+     * 새로 생성할 병합 브랜치 이름
      * @type {string}
      * @memberof MergeRequest
      */
     branchName: string;
     /**
-     * 
+     * 병합 기준으로 사용할 커밋 ID
      * @type {number}
      * @memberof MergeRequest
      */
     baseCommitId: number;
     /**
-     * 
+     * 함께 병합할 대상 커밋 ID
      * @type {number}
      * @memberof MergeRequest
      */
     targetCommitId: number;
     /**
-     * 
+     * 프론트에서 사용자가 직접 조합한 최종 Editor.js 블록 배열
      * @type {Array<{ [key: string]: any; }>}
      * @memberof MergeRequest
      */

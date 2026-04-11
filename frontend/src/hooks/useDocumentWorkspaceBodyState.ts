@@ -541,19 +541,31 @@ export function useDocumentWorkspaceBodyState({
       if (!branch?.saveId) return
 
       const nextView: ViewState = { mode: "workspace", branchId, workspaceId: branch.saveId }
+      if (isSameView(view, nextView)) return
+      setWorkspaces((prev) =>
+        prev.map((workspace) =>
+          workspace.id === branch.saveId ? { ...workspace, loaded: false } : workspace,
+        ),
+      )
       setView(nextView)
       pushViewToUrl(nextView)
     },
-    [branches, pushViewToUrl],
+    [branches, pushViewToUrl, view],
   )
 
   const openCommit = useCallback(
     (branchId: number, commitId: number) => {
       const nextView: ViewState = { mode: "commit", branchId, commitId }
+      if (isSameView(view, nextView)) return
+      setCommits((prev) =>
+        prev.map((commit) =>
+          commit.id === commitId ? { ...commit, loaded: false } : commit,
+        ),
+      )
       setView(nextView)
       pushViewToUrl(nextView)
     },
-    [pushViewToUrl],
+    [pushViewToUrl, view],
   )
 
   return {

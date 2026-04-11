@@ -345,7 +345,7 @@ export function useDocumentWorkspaceActions({
             },
           })
           setSyncStatus("synced")
-          setToast("작업 내용이 자동 반영되었습니다.")
+          setToast("작업장 변경사항이 자동 저장되었습니다.")
         } catch (error: any) {
           setSyncStatus("idle")
           await alertDialog(

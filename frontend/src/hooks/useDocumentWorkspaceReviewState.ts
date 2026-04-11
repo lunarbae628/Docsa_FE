@@ -187,6 +187,7 @@ export function useDocumentWorkspaceReviewState({
 
   const compareBaseData = useMemo(() => {
     if (!compareBaseItem) return null
+    if (isRealDocument && compareBaseSnapshotQuery.data === undefined) return null
     return createOutputData(
       isRealDocument ? compareBaseSnapshotQuery.data ?? [] : compareBaseItem.blocks,
     )
@@ -194,6 +195,7 @@ export function useDocumentWorkspaceReviewState({
 
   const compareTargetData = useMemo(() => {
     if (!compareTargetItem) return null
+    if (isRealDocument && compareTargetSnapshotQuery.data === undefined) return null
     return createOutputData(
       isRealDocument ? compareTargetSnapshotQuery.data ?? [] : compareTargetItem.blocks,
     )
@@ -201,6 +203,7 @@ export function useDocumentWorkspaceReviewState({
 
   const mergeSourceData = useMemo(() => {
     if (!mergeSourceItem) return null
+    if (isRealDocument && mergeSourceSnapshotQuery.data === undefined) return null
     return createOutputData(
       isRealDocument ? mergeSourceSnapshotQuery.data ?? [] : mergeSourceItem.blocks,
     )
@@ -208,6 +211,7 @@ export function useDocumentWorkspaceReviewState({
 
   const mergeTargetData = useMemo(() => {
     if (!mergeTargetItem) return null
+    if (isRealDocument && mergeTargetSnapshotQuery.data === undefined) return null
     return createOutputData(
       isRealDocument ? mergeTargetSnapshotQuery.data ?? [] : mergeTargetItem.blocks,
     )

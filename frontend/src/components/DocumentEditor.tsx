@@ -41,6 +41,11 @@ function createOutputData(blocks: OutputData["blocks"]): OutputData {
   }
 }
 
+function getDataSignature(data: OutputData | undefined) {
+  if (!data) return ""
+  return JSON.stringify(data.blocks ?? [])
+}
+
 function isMarkdownShortcutCandidate(text: string) {
   const normalized = text.replace(/<br\s*\/?>/gi, "\n").trim()
 
@@ -74,6 +79,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
     const [isReady, setIsReady] = useState(false)
     const shouldUpdateOnChangeRef = useRef(shouldUpdateOnChange)
     const isApplyingShortcutRef = useRef(false)
+    const lastRenderedDataSignatureRef = useRef("")
 
     const normalizeBlocksForCompare = useCallback((data: OutputData) => {
       return JSON.stringify(
@@ -173,6 +179,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       }
 
       // Initialize Editor.js with default tools
+      lastRenderedDataSignatureRef.current = getDataSignature(initialData)
       const editor = new EditorJS({
         holder: containerRef.current,
         readOnly: !isEditable,
@@ -323,9 +330,15 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
     // initialData 변경 시 에디터 내용 업데이트 (재생성 없이)
     useEffect(() => {
       if (editorRef.current && isReady && initialData && !disableAutoUpdate) {
+        const nextDataSignature = getDataSignature(initialData)
+        if (lastRenderedDataSignatureRef.current === nextDataSignature) {
+          return
+        }
+
         editorRef.current.render(initialData).catch((error) => {
           console.error("Error updating editor data:", error)
         })
+        lastRenderedDataSignatureRef.current = nextDataSignature
       }
     }, [initialData, isReady, disableAutoUpdate])
 

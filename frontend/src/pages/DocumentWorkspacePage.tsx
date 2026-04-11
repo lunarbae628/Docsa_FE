@@ -1,5 +1,15 @@
-import { useEffect } from "react"
-import { GitCommitHorizontal, GitCompareArrows, GitMerge, Play, Trash2, X } from "lucide-react"
+import { useEffect, useState } from "react"
+import {
+  CircleCheck,
+  CloudOff,
+  GitCommitHorizontal,
+  GitCompareArrows,
+  GitMerge,
+  Loader2,
+  Play,
+  Trash2,
+  X,
+} from "lucide-react"
 import { useParams, useSearchParams } from "react-router"
 import ResizableLayout from "@/layouts/ResizableLayout"
 import DocumentWorkspaceGraphPanel from "@/components/DocumentWorkspaceGraphPanel"
@@ -28,6 +38,91 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+
+function useDelayedFlag(value: boolean, delayMs = 180) {
+  const [isDelayed, setIsDelayed] = useState(false)
+
+  useEffect(() => {
+    if (!value) {
+      setIsDelayed(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => setIsDelayed(true), delayMs)
+    return () => window.clearTimeout(timer)
+  }, [delayMs, value])
+
+  return isDelayed
+}
+
+function DocumentPendingCanvas({
+  label,
+  visible,
+  compact = false,
+}: {
+  label: string
+  visible: boolean
+  compact?: boolean
+}) {
+  return (
+    <div className="h-full min-h-[760px] bg-white px-16 py-14">
+      <div
+        className={`mx-auto max-w-3xl transition-opacity duration-200 ${
+          visible ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="mb-10 flex items-center gap-3 text-xs font-medium text-slate-400">
+          <span className="h-2 w-2 rounded-full bg-slate-300" />
+          {label}
+        </div>
+        <div className="space-y-5">
+          <div className="h-7 w-2/5 rounded-full bg-slate-100" />
+          <div className="h-4 w-full rounded-full bg-slate-100" />
+          <div className="h-4 w-11/12 rounded-full bg-slate-100" />
+          <div className="h-4 w-4/5 rounded-full bg-slate-100" />
+          {!compact ? (
+            <>
+              <div className="mt-8 h-4 w-10/12 rounded-full bg-slate-100" />
+              <div className="h-4 w-7/12 rounded-full bg-slate-100" />
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function WorkspaceAutosaveStatus({
+  status,
+}: {
+  status: "idle" | "syncing" | "synced"
+}) {
+  const isSyncing = status === "syncing"
+  const isSynced = status === "synced"
+
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold shadow-sm transition-colors ${
+        isSyncing
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : isSynced
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-red-200 bg-red-50 text-red-700"
+      }`}
+    >
+      {isSyncing ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : isSynced ? (
+        <CircleCheck className="h-4 w-4" />
+      ) : (
+        <CloudOff className="h-4 w-4" />
+      )}
+      <span className="whitespace-nowrap">
+        {isSyncing ? "작업장 저장 중" : isSynced ? "작업장 저장됨" : "저장 확인 필요"}
+      </span>
+    </div>
+  )
+}
 
 export default function DocumentWorkspacePage() {
   const { id: documentIdParam } = useParams()
@@ -196,6 +291,32 @@ export default function DocumentWorkspacePage() {
         : view.mode === "merge"
           ? "기록 병합"
           : `${currentBranch?.name ?? "branch"} 기록`
+
+  const isCurrentWorkspaceContentReady =
+    view.mode === "workspace" &&
+    currentWorkspace?.loaded &&
+    requestedDocumentMode === "save" &&
+    requestedSaveId === currentWorkspace.id &&
+    directSelectedContent.isCurrentDataReady
+
+  const isCurrentCommitContentReady =
+    view.mode === "commit" &&
+    currentCommit?.loaded &&
+    requestedDocumentMode === "commit" &&
+    requestedCommitId === currentCommit.id &&
+    directSelectedContent.isCurrentDataReady
+
+  const showDirectContentPending = useDelayedFlag(
+    (view.mode === "workspace" && !isCurrentWorkspaceContentReady) ||
+      (view.mode === "commit" && !isCurrentCommitContentReady),
+  )
+  const showReviewContentPending = useDelayedFlag(
+    view.mode === "compare"
+      ? !compareBaseReady || Boolean(compareBaseItem && view.compareId && !compareTargetReady)
+      : view.mode === "merge"
+        ? !mergeBaseReady || Boolean(mergeSourceItem && view.targetId && !mergeTargetReady)
+        : false,
+  )
 
   const graphMainBranch =
     mainBranch ??
@@ -413,13 +534,9 @@ export default function DocumentWorkspacePage() {
                       <X className="h-4 w-4" /> 병합 종료
                     </Button>
                   ) : null}
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                    {syncStatus === "syncing"
-                      ? "자동 반영 중"
-                      : syncStatus === "synced"
-                        ? "자동 반영됨"
-                        : "대기 중"}
-                  </span>
+                  {view.mode === "workspace" ? (
+                    <WorkspaceAutosaveStatus status={syncStatus} />
+                  ) : null}
                 </div>
               </div>
 
@@ -435,7 +552,7 @@ export default function DocumentWorkspacePage() {
                 }`}
               >
                 {view.mode === "workspace" ? (
-                  currentWorkspace?.loaded ? (
+                  isCurrentWorkspaceContentReady ? (
                     <div className="h-full min-h-[760px]">
                       <DocumentEditor
                         key={`workspace-${currentWorkspace.id}`}
@@ -447,13 +564,18 @@ export default function DocumentWorkspacePage() {
                         contentLayout="document"
                       />
                     </div>
-                  ) : (
-                    <div className="flex h-full min-h-[760px] items-center justify-center text-sm text-slate-500">
-                      선택한 작업장을 불러오는 중입니다...
+                  ) : directSelectedContent.error ? (
+                    <div className="flex h-full min-h-[760px] items-center justify-center text-sm text-red-500">
+                      선택한 작업장을 불러오지 못했습니다.
                     </div>
+                  ) : (
+                    <DocumentPendingCanvas
+                      label="작업장 내용을 준비하는 중"
+                      visible={showDirectContentPending}
+                    />
                   )
                 ) : view.mode === "commit" ? (
-                  currentCommit?.loaded ? (
+                  isCurrentCommitContentReady ? (
                     <div className="h-full min-h-[760px]">
                       <DocumentEditor
                         key={`commit-${currentCommit.id}`}
@@ -463,10 +585,15 @@ export default function DocumentWorkspacePage() {
                         contentLayout="document"
                       />
                     </div>
-                  ) : (
-                    <div className="flex h-full min-h-[760px] items-center justify-center text-sm text-slate-500">
-                      선택한 기록을 불러오는 중입니다...
+                  ) : directSelectedContent.error ? (
+                    <div className="flex h-full min-h-[760px] items-center justify-center text-sm text-red-500">
+                      선택한 기록을 불러오지 못했습니다.
                     </div>
+                  ) : (
+                    <DocumentPendingCanvas
+                      label="기록 내용을 준비하는 중"
+                      visible={showDirectContentPending}
+                    />
                   )
                 ) : view.mode === "merge" ? (
                   mergeBaseReady &&
@@ -523,10 +650,12 @@ export default function DocumentWorkspacePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex h-full min-h-[760px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm text-slate-500 shadow-sm">
-                      {view.targetId
-                        ? "선택한 병합 대상을 불러오는 중입니다..."
-                        : "병합 기준 문서를 불러오는 중입니다..."}
+                    <div className="h-full min-h-[760px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <DocumentPendingCanvas
+                        label={view.targetId ? "병합 대상 준비 중" : "병합 기준 준비 중"}
+                        visible={showReviewContentPending}
+                        compact
+                      />
                     </div>
                   )
                 ) : compareTargetItem &&
@@ -577,10 +706,16 @@ export default function DocumentWorkspacePage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex h-full min-h-[760px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm text-slate-500 shadow-sm">
-                    {view.mode === "compare" && view.compareId
-                      ? "선택한 비교 대상을 불러오는 중입니다..."
-                      : "비교 기준 문서를 불러오는 중입니다..."}
+                  <div className="h-full min-h-[760px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <DocumentPendingCanvas
+                      label={
+                        view.mode === "compare" && view.compareId
+                          ? "비교 대상 준비 중"
+                          : "비교 기준 준비 중"
+                      }
+                      visible={showReviewContentPending}
+                      compact
+                    />
                   </div>
                 )}
               </div>

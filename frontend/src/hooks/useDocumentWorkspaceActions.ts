@@ -5,6 +5,7 @@ import type { Dispatch, SetStateAction } from "react"
 import type { SetURLSearchParams } from "react-router"
 import { apiClient } from "@/api/apiClient"
 import { alertDialog } from "@/lib/utils"
+import { getApiErrorMessage } from "@/lib/apiError"
 import type { GraphDataType } from "@/types/graph"
 import type { CommitNodeMenuType } from "@/components/CommitNode"
 import type { TempNodeMenuType } from "@/components/TempNode"
@@ -349,7 +350,7 @@ export function useDocumentWorkspaceActions({
         } catch (error: any) {
           setSyncStatus("idle")
           await alertDialog(
-            error.message || "작업장 자동 저장에 실패했습니다.",
+            await getApiErrorMessage(error, "작업장 자동 저장에 실패했습니다."),
             "오류",
             "destructive",
           )
@@ -401,7 +402,7 @@ export function useDocumentWorkspaceActions({
         setToast(`기록 '${title}'을 남기고 작업장을 그대로 유지했습니다.`)
       } catch (error: any) {
         await alertDialog(
-          error.message || "기록 생성에 실패했습니다.",
+          await getApiErrorMessage(error, "기록 생성에 실패했습니다."),
           "오류",
           "destructive",
         )
@@ -486,7 +487,7 @@ export function useDocumentWorkspaceActions({
         setToast(`${branchName} 작업장을 열었습니다.`)
       } catch (error: any) {
         await alertDialog(
-          error.message || "이어서 작업하기에 실패했습니다.",
+          await getApiErrorMessage(error, "이어서 작업하기에 실패했습니다."),
           "오류",
           "destructive",
         )
@@ -613,7 +614,7 @@ export function useDocumentWorkspaceActions({
         setToast(`기록 "${targetCommit.title}"을 삭제했습니다.`)
       } catch (error: any) {
         await alertDialog(
-          error.message || "기록 삭제에 실패했습니다.",
+          await getApiErrorMessage(error, "기록 삭제에 실패했습니다."),
           "오류",
           "destructive",
         )
@@ -677,7 +678,7 @@ export function useDocumentWorkspaceActions({
         setToast(`${targetBranch.name} 브랜치를 삭제하고 main 작업장으로 돌아왔습니다.`)
       } catch (error: any) {
         await alertDialog(
-          error.message || "브랜치 삭제에 실패했습니다.",
+          await getApiErrorMessage(error, "브랜치 삭제에 실패했습니다."),
           "오류",
           "destructive",
         )
@@ -766,7 +767,7 @@ export function useDocumentWorkspaceActions({
         setMergeBranchState(null)
       } catch (error: any) {
         await alertDialog(
-          error.message || "병합 적용에 실패했습니다.",
+          await getApiErrorMessage(error, "병합 적용에 실패했습니다."),
           "오류",
           "destructive",
         )
@@ -880,7 +881,7 @@ export function useDocumentWorkspaceActions({
         setToast(`${newName} 브랜치 이름으로 변경했습니다.`)
       } catch (error: any) {
         await alertDialog(
-          error.message || "브랜치 이름 변경에 실패했습니다.",
+          await getApiErrorMessage(error, "브랜치 이름 변경에 실패했습니다."),
           "오류",
           "destructive",
         )

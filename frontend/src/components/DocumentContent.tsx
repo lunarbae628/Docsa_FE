@@ -11,6 +11,7 @@ import { useRef, useState, useMemo, useCallback } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { calculateBlockDiffById } from "@/lib/diffUtils"
 import { editorDataToMarkdown, markdownToEditorData } from "@/lib/editorMarkdown"
+import { getApiErrorMessage } from "@/lib/apiError"
 
 import { useDialog, alertDialog } from "./ui/alert-dialog"
 import { useNavigate } from "react-router"
@@ -133,7 +134,7 @@ export default function DocumentContent({
       console.error("저장 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      const errorMessage = error.message || "저장에 실패했습니다."
+      const errorMessage = await getApiErrorMessage(error, "저장에 실패했습니다.")
 
       console.log("errorMessage", errorMessage)
 
@@ -174,7 +175,7 @@ export default function DocumentContent({
       console.error("기록 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      const  errorMessage =  error.message || "기록에 실패했습니다."
+      const errorMessage = await getApiErrorMessage(error, "기록에 실패했습니다.")
 
       console.log("errorMessage", errorMessage)
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/api/apiClient"
 import { alertDialog } from "@/lib/utils"
+import { getApiErrorMessage } from "@/lib/apiError"
 
 export function useCreateDocument() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -39,7 +40,10 @@ export function useCreateDocument() {
       console.error("문서 생성 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      const errorMessage = error.message || "문서 생성에 실패했습니다.";
+      const errorMessage = await getApiErrorMessage(
+        error,
+        "문서 생성에 실패했습니다.",
+      )
 
       console.log("errorMessage", errorMessage)
 

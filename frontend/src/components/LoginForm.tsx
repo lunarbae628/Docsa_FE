@@ -15,6 +15,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import { apiClient } from "@/api/apiClient"
+import { getApiErrorMessage } from "@/lib/apiError"
 
 const loginSchema = z.object({
   email: z.string().email("올바른 이메일 주소를 입력해주세요"),
@@ -65,10 +66,10 @@ export default function LoginForm({
       // 실제로는 리다이렉트 또는 상태 업데이트
     } catch (error) {
       setError("root", {
-        message:
-          error instanceof Error
-            ? error.message
-            : "로그인 중 오류가 발생했습니다. 다시 시도해주세요.",
+        message: await getApiErrorMessage(
+          error,
+          "로그인 중 오류가 발생했습니다. 다시 시도해주세요.",
+        ),
       })
     } finally {
       setIsLoading(false)

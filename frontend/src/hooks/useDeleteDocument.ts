@@ -2,6 +2,7 @@ import { useQueryClient, useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { alertDialog } from "@/lib/utils"
+import { getApiErrorMessage } from "@/lib/apiError"
 import type { Document } from "@/mock/DocumentList"
 import { apiClient } from "@/api/apiClient"
 
@@ -34,7 +35,10 @@ export function useDeleteDocument() {
       console.error("문서 삭제 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      const errorMessage = error.message || "문서 삭제에 실패했습니다.";
+      const errorMessage = await getApiErrorMessage(
+        error,
+        "문서 삭제에 실패했습니다.",
+      )
       
       console.log("errorMessage", errorMessage)
 

@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/api/apiClient"
 import { alertDialog } from "@/lib/utils"
+import { getApiErrorMessage } from "@/lib/apiError"
 import type { DocListResponse } from "@/api/__generated__/models/DocListResponse"
 
 interface UseEditDocumentProps {
@@ -45,16 +46,19 @@ export function useEditDocument({ documents }: UseEditDocumentProps) {
 
       console.log("문서 제목 수정 완료:", response)
     },
-    onError:  (error: any) => {
+    onError: async (error: any) => {
       console.error("제목 수정 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      const errorMessage = error.message || "제목 수정에 실패했습니다."
+      const errorMessage = await getApiErrorMessage(
+        error,
+        "제목 수정에 실패했습니다.",
+      )
 
       console.log("errorMessage", errorMessage)
 
       // 여기서 토스트 알림이나 에러 처리를 할 수 있습니다
-      alertDialog(errorMessage, "제목 수정 오류", "destructive")
+      await alertDialog(errorMessage, "제목 수정 오류", "destructive")
     },
   })
 

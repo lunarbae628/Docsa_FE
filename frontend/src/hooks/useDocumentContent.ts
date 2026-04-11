@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { apiClient } from "@/api/apiClient"
+import { getApiErrorMessage } from "@/lib/apiError"
 import type { DocumentMode } from "@/types/document"
 import type { SaveGetResponse, CommitResponse } from "@/api/__generated__"
 
@@ -193,7 +194,10 @@ export function useDocumentContent({
         }
       } catch (err: any) {
         if (latestRequestKeyRef.current !== requestKey) return
-        const errorMessage = err.message || "데이터를 가져오는 중 오류가 발생했습니다"
+        const errorMessage = await getApiErrorMessage(
+          err,
+          "데이터를 가져오는 중 오류가 발생했습니다",
+        )
         setError(errorMessage)
         setErrorRequestKey(requestKey)
         console.error("useDocumentContent 오류:", err)

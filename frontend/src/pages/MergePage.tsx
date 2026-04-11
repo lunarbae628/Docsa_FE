@@ -6,6 +6,8 @@ import { apiClient } from "@/api/apiClient"
 import type { OutputData } from "@editorjs/editorjs"
 import Loading from "@/components/Loading"
 import { alertDialog } from "@/lib/utils"
+import { getApiErrorMessage } from "@/lib/apiError"
+import { useEffect, useState } from "react"
 
 export default function MergePage() {
   const [searchParams] = useSearchParams()
@@ -14,6 +16,7 @@ export default function MergePage() {
   const targetCommitId = searchParams.get("targetCommitId")
 
   const navigate = useNavigate()
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null)
 
   if (!documentId || !baseCommitId || !targetCommitId) {
     throw new Error("Invalid search params")
@@ -56,16 +59,36 @@ export default function MergePage() {
       navigate(`/documents/${documentId}`)
       window.location.reload()
     },
-    onError:  (error: any) => {
+    onError: async (error: any) => {
       console.error("Merge failed:", error)
 
-      // 서버에서 내려온 에러 메시지 추출
-      const errorMessage = error.message || "병합 중 오류가 발생했습니다.";
+      const errorMessage = await getApiErrorMessage(
+        error,
+        "병합 중 오류가 발생했습니다.",
+      )
 
       // 에러 처리 (추후 toast 등으로 개선 가능)
-      alertDialog(errorMessage, "병합 오류", "destructive")
+      await alertDialog(errorMessage, "병합 오류", "destructive")
     },
   })
+
+  useEffect(() => {
+    if (!error) {
+      setLoadErrorMessage(null)
+      return
+    }
+
+    let isMounted = true
+    void getApiErrorMessage(error, "병합 데이터를 불러오는 중 오류가 발생했습니다.").then(
+      (message) => {
+        if (isMounted) setLoadErrorMessage(message)
+      },
+    )
+
+    return () => {
+      isMounted = false
+    }
+  }, [error])
 
   const handleSave = async (mergedData: OutputData) => {
     mergeMutation.mutate(mergedData)
@@ -87,7 +110,7 @@ export default function MergePage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-red-500">
-          데이터를 불러오는 중 오류가 발생했습니다: {error.message}
+          {loadErrorMessage ?? "병합 데이터를 불러오는 중 오류가 발생했습니다."}
         </div>
       </div>
     )

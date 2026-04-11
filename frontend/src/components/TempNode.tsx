@@ -9,6 +9,7 @@ interface TempNodeProps {
   branchName: string
   color: string
   isCurrentTemp: boolean
+  selectionRole?: "base" | "source" | "target" | null
   title: string
   description: string
   onNodeMenuClick: (
@@ -32,6 +33,7 @@ const TempNode = React.memo(function TempNode({
   tempId,
   color,
   isCurrentTemp,
+  selectionRole,
   onNodeMenuClick,
 }: TempNodeProps) {
   return (
@@ -41,7 +43,11 @@ const TempNode = React.memo(function TempNode({
 
       <div
         className={`nodrag nopan w-[228px] rounded-[24px] border bg-white px-4 py-3.5 text-left shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-colors ${
-          isCurrentTemp
+          selectionRole === "target"
+            ? "border-emerald-500 bg-emerald-50/50 ring-4 ring-emerald-100"
+            : selectionRole
+              ? "border-orange-400 bg-orange-50/50 ring-4 ring-orange-100"
+              : isCurrentTemp
             ? "border-amber-400 bg-amber-50/50 ring-4 ring-amber-100"
             : "border-slate-200 hover:border-slate-300"
         }`}
@@ -66,7 +72,11 @@ const TempNode = React.memo(function TempNode({
                 className="inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-semibold"
                 style={{ backgroundColor: `${color}14`, color }}
               >
-                워크스페이스
+                {selectionRole === "target"
+                  ? "선택 대상"
+                  : selectionRole
+                    ? "기준"
+                    : "워크스페이스"}
               </span>
             </div>
             <div className="mt-1 text-[13px] text-slate-500">

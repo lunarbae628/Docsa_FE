@@ -345,6 +345,10 @@ export function useDocumentWorkspaceActions({
               content: nextBlocks,
             },
           })
+          queryClient.setQueryData(
+            ["snapshotContent", documentId, "workspace", currentWorkspace.id],
+            nextBlocks,
+          )
           setSyncStatus("synced")
           setToast("작업장 변경사항이 자동 저장되었습니다.")
         } catch (error: any) {
@@ -357,7 +361,7 @@ export function useDocumentWorkspaceActions({
         }
       }, 700)
     },
-    [currentWorkspace, documentId, isRealDocument, setWorkspaces],
+    [currentWorkspace, documentId, isRealDocument, queryClient, setWorkspaces],
   )
 
   const handleCommitConfirm = useCallback(
@@ -630,6 +634,7 @@ export function useDocumentWorkspaceActions({
       setBranches,
       setCommits,
       setSearchParams,
+      queryClient,
       updateGraphData,
     ],
   )
@@ -697,6 +702,7 @@ export function useDocumentWorkspaceActions({
       setCommits,
       setSearchParams,
       setWorkspaces,
+      queryClient,
       updateGraphData,
       workspaces,
     ],
@@ -744,6 +750,8 @@ export function useDocumentWorkspaceActions({
           throw new Error("병합 작업장을 만들지 못했습니다.")
         }
 
+        const mergedBlocks = (mergedData.blocks ?? []) as SnapshotBlock[]
+
         updateGraphData((current) =>
           updateGraphCacheAfterBranchCreate(current, {
             id: mergeResult.branchId,
@@ -755,6 +763,10 @@ export function useDocumentWorkspaceActions({
             leafCommitId: null,
             saveId: mergeResult.saveId ?? null,
           }),
+        )
+        queryClient.setQueryData(
+          ["snapshotContent", documentId, "workspace", mergeResult.saveId],
+          mergedBlocks,
         )
 
         const nextParams = new URLSearchParams({
@@ -781,6 +793,7 @@ export function useDocumentWorkspaceActions({
       isRealDocument,
       mergeSourceItem,
       mergeTargetItem,
+      queryClient,
       refreshDocumentState,
       setSearchParams,
       updateGraphData,

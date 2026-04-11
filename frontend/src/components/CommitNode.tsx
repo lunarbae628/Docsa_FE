@@ -18,6 +18,7 @@ interface CommitNodeProps {
   isCurrentCommit: boolean
   isLastCommit: boolean
   showMergeButton: boolean
+  selectionRole?: "base" | "source" | "target" | null
   onNodeMenuClick: (
     type: CommitNodeMenuType,
     commitId: number,
@@ -50,6 +51,7 @@ const CommitNode = React.memo(function CommitNode({
   isCurrentCommit,
   isLastCommit,
   showMergeButton,
+  selectionRole,
   onNodeMenuClick,
 }: CommitNodeProps) {
   const [hoveredCommit, setHoveredCommit] = useState<{
@@ -64,7 +66,13 @@ const CommitNode = React.memo(function CommitNode({
 
       <div
         className={`nodrag nopan group relative w-[228px] rounded-[24px] ${
-          isCurrentCommit ? "ring-4 ring-sky-100" : ""
+          selectionRole === "target"
+            ? "ring-4 ring-emerald-100"
+            : selectionRole
+              ? "ring-4 ring-orange-100"
+              : isCurrentCommit
+                ? "ring-4 ring-sky-100"
+                : ""
         }`}
         onMouseEnter={(e) => {
           const rect = e.currentTarget.getBoundingClientRect()
@@ -80,7 +88,11 @@ const CommitNode = React.memo(function CommitNode({
       >
         <div
           className={`w-full rounded-[24px] border bg-white px-4 py-3.5 text-left shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-colors ${
-            isCurrentCommit
+            selectionRole === "target"
+              ? "border-emerald-500 bg-emerald-50/40"
+              : selectionRole
+                ? "border-orange-400 bg-orange-50/40"
+                : isCurrentCommit
               ? "border-sky-500 bg-sky-50/40"
               : "border-slate-200 group-hover:border-slate-300"
           }`}
@@ -100,6 +112,17 @@ const CommitNode = React.memo(function CommitNode({
             <div className="truncate text-[15px] font-semibold tracking-[-0.03em] text-slate-900">
               {commit.title}
             </div>
+            {selectionRole ? (
+              <div
+                className={`mt-1 inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold ${
+                  selectionRole === "target"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-orange-100 text-orange-700"
+                }`}
+              >
+                {selectionRole === "target" ? "선택 대상" : "기준"}
+              </div>
+            ) : null}
             <div className="mt-1 line-clamp-2 text-[13px] leading-5 text-slate-500">
               {commit.description || "기록된 변경사항"}
             </div>

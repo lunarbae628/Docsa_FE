@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -19,12 +19,16 @@ type CompareSelectionState = {
   active: boolean
   baseKind: "commit" | "workspace"
   baseId: number
+  targetKind: "commit" | "workspace" | null
+  targetId: number | null
 }
 
 type MergeSelectionState = {
   active: boolean
   sourceKind: "commit" | "workspace"
   sourceId: number
+  targetKind: "commit" | "workspace" | null
+  targetId: number | null
 }
 
 export interface DocumentGraphProps {
@@ -82,6 +86,7 @@ function CommitFlowNode({
   showMergeButton: boolean
   onNodeMenuClick: DocumentGraphProps["onNodeMenuClick"]
   isCurrentCommitLastCommit: boolean
+  selectionRole: "base" | "source" | "target" | null
 }>) {
   return (
     <CommitNode
@@ -92,6 +97,7 @@ function CommitFlowNode({
       isLastCommit={data.isLastCommit}
       showMergeButton={data.showMergeButton && data.isCurrentCommitLastCommit}
       onNodeMenuClick={data.onNodeMenuClick}
+      selectionRole={data.selectionRole}
       openDropdownId={null}
       setOpenDropdownId={() => {}}
     />
@@ -108,6 +114,7 @@ function TempFlowNode({
   title: string
   description: string
   onNodeMenuClick: DocumentGraphProps["onNodeMenuClick"]
+  selectionRole: "base" | "source" | "target" | null
 }>) {
   return (
     <TempNode
@@ -118,6 +125,7 @@ function TempFlowNode({
       title={data.title}
       description={data.description}
       onNodeMenuClick={data.onNodeMenuClick}
+      selectionRole={data.selectionRole}
       openDropdownId={null}
       setOpenDropdownId={() => {}}
     />
@@ -166,6 +174,78 @@ export default function DocumentGraph({
     currentBranch?.leafCommitId === Number(currentCommitId) &&
     !currentBranch?.saveId
 
+  const resolveCommitSelectionRole = useCallback(
+    (commitId: number | null | undefined) => {
+      if (!commitId) return null
+      if (
+        compareSelection?.active &&
+        compareSelection.baseKind === "commit" &&
+        compareSelection.baseId === commitId
+      ) {
+        return "base" as const
+      }
+      if (
+        compareSelection?.active &&
+        compareSelection.targetKind === "commit" &&
+        compareSelection.targetId === commitId
+      ) {
+        return "target" as const
+      }
+      if (
+        mergeSelection?.active &&
+        mergeSelection.sourceKind === "commit" &&
+        mergeSelection.sourceId === commitId
+      ) {
+        return "source" as const
+      }
+      if (
+        mergeSelection?.active &&
+        mergeSelection.targetKind === "commit" &&
+        mergeSelection.targetId === commitId
+      ) {
+        return "target" as const
+      }
+      return null
+    },
+    [compareSelection, mergeSelection],
+  )
+
+  const resolveWorkspaceSelectionRole = useCallback(
+    (saveId: number | null | undefined) => {
+      if (!saveId) return null
+      if (
+        compareSelection?.active &&
+        compareSelection.baseKind === "workspace" &&
+        compareSelection.baseId === saveId
+      ) {
+        return "base" as const
+      }
+      if (
+        compareSelection?.active &&
+        compareSelection.targetKind === "workspace" &&
+        compareSelection.targetId === saveId
+      ) {
+        return "target" as const
+      }
+      if (
+        mergeSelection?.active &&
+        mergeSelection.sourceKind === "workspace" &&
+        mergeSelection.sourceId === saveId
+      ) {
+        return "source" as const
+      }
+      if (
+        mergeSelection?.active &&
+        mergeSelection.targetKind === "workspace" &&
+        mergeSelection.targetId === saveId
+      ) {
+        return "target" as const
+      }
+      return null
+    },
+    [compareSelection, mergeSelection],
+  )
+
   const nodes = useMemo(
     () =>
       rawNodes.map((node: any) => ({
@@ -176,9 +256,21 @@ export default function DocumentGraph({
           ...node.data,
           onNodeMenuClick,
           isCurrentCommitLastCommit,
+          selectionRole:
+            node.data.nodeType === "commit"
+              ? resolveCommitSelectionRole(node.data.commit?.id)
+              : node.data.nodeType === "temp"
+                ? resolveWorkspaceSelectionRole(node.data.saveId)
+                : null,
         },
       })),
-    [rawNodes, onNodeMenuClick, isCurrentCommitLastCommit],
+    [
+      rawNodes,
+      onNodeMenuClick,
+      isCurrentCommitLastCommit,
+      resolveCommitSelectionRole,
+      resolveWorkspaceSelectionRole,
+    ],
   )
 
   const nodeTypes = useMemo(
@@ -200,21 +292,23 @@ export default function DocumentGraph({
     }
 
     if (node?.data?.nodeType === "commit" && node.data.commit) {
-      if (
-        mergeSelection?.active &&
-        onMergeTargetPick &&
-        !(mergeSelection.sourceKind === "commit" && mergeSelection.sourceId === node.data.commit.id)
-      ) {
-        onMergeTargetPick("commit", node.data.commit.id)
+      if (mergeSelection?.active) {
+        if (
+          onMergeTargetPick &&
+          !(mergeSelection.sourceKind === "commit" && mergeSelection.sourceId === node.data.commit.id)
+        ) {
+          onMergeTargetPick("commit", node.data.commit.id)
+        }
         return
       }
 
-      if (
-        compareSelection?.active &&
-        onCompareTargetPick &&
-        !(compareSelection.baseKind === "commit" && compareSelection.baseId === node.data.commit.id)
-      ) {
-        onCompareTargetPick("commit", node.data.commit.id)
+      if (compareSelection?.active) {
+        if (
+          onCompareTargetPick &&
+          !(compareSelection.baseKind === "commit" && compareSelection.baseId === node.data.commit.id)
+        ) {
+          onCompareTargetPick("commit", node.data.commit.id)
+        }
         return
       }
 
@@ -227,21 +321,23 @@ export default function DocumentGraph({
     }
 
     if (node?.data?.nodeType === "temp" && node.data.saveId) {
-      if (
-        mergeSelection?.active &&
-        onMergeTargetPick &&
-        !(mergeSelection.sourceKind === "workspace" && mergeSelection.sourceId === node.data.saveId)
-      ) {
-        onMergeTargetPick("workspace", node.data.saveId)
+      if (mergeSelection?.active) {
+        if (
+          onMergeTargetPick &&
+          !(mergeSelection.sourceKind === "workspace" && mergeSelection.sourceId === node.data.saveId)
+        ) {
+          onMergeTargetPick("workspace", node.data.saveId)
+        }
         return
       }
 
-      if (
-        compareSelection?.active &&
-        onCompareTargetPick &&
-        !(compareSelection.baseKind === "workspace" && compareSelection.baseId === node.data.saveId)
-      ) {
-        onCompareTargetPick("workspace", node.data.saveId)
+      if (compareSelection?.active) {
+        if (
+          onCompareTargetPick &&
+          !(compareSelection.baseKind === "workspace" && compareSelection.baseId === node.data.saveId)
+        ) {
+          onCompareTargetPick("workspace", node.data.saveId)
+        }
         return
       }
 

@@ -400,6 +400,8 @@ export default function DocumentWorkspacePage() {
                     active: true,
                     baseKind: view.baseKind,
                     baseId: view.baseId,
+                    targetKind: view.compareKind,
+                    targetId: view.compareId,
                   }
                 : null
             }
@@ -409,6 +411,8 @@ export default function DocumentWorkspacePage() {
                     active: true,
                     sourceKind: view.sourceKind,
                     sourceId: view.sourceId,
+                    targetKind: view.targetKind,
+                    targetId: view.targetId,
                   }
                 : null
             }

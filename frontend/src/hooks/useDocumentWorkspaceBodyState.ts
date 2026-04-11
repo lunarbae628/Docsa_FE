@@ -542,30 +542,36 @@ export function useDocumentWorkspaceBodyState({
 
       const nextView: ViewState = { mode: "workspace", branchId, workspaceId: branch.saveId }
       if (isSameView(view, nextView)) return
-      setWorkspaces((prev) =>
-        prev.map((workspace) =>
-          workspace.id === branch.saveId ? { ...workspace, loaded: false } : workspace,
-        ),
-      )
+      const targetWorkspace = workspaces.find((workspace) => workspace.id === branch.saveId)
+      if (!targetWorkspace?.loaded) {
+        setWorkspaces((prev) =>
+          prev.map((workspace) =>
+            workspace.id === branch.saveId ? { ...workspace, loaded: false } : workspace,
+          ),
+        )
+      }
       setView(nextView)
       pushViewToUrl(nextView)
     },
-    [branches, pushViewToUrl, view],
+    [branches, pushViewToUrl, view, workspaces],
   )
 
   const openCommit = useCallback(
     (branchId: number, commitId: number) => {
       const nextView: ViewState = { mode: "commit", branchId, commitId }
       if (isSameView(view, nextView)) return
-      setCommits((prev) =>
-        prev.map((commit) =>
-          commit.id === commitId ? { ...commit, loaded: false } : commit,
-        ),
-      )
+      const targetCommit = commits.find((commit) => commit.id === commitId)
+      if (!targetCommit?.loaded) {
+        setCommits((prev) =>
+          prev.map((commit) =>
+            commit.id === commitId ? { ...commit, loaded: false } : commit,
+          ),
+        )
+      }
       setView(nextView)
       pushViewToUrl(nextView)
     },
-    [pushViewToUrl, view],
+    [commits, pushViewToUrl, view],
   )
 
   return {

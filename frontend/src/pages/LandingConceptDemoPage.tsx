@@ -163,10 +163,10 @@ export default function LandingConceptDemoPage() {
   });
 
   const badFiles = [
-    '문서집계표(최종).HWP',
-    '문서집계표(최종수정컨펌).HWP',
-    '문서집계표(진짜최종).HWP',
-    '문서집계표(회장님지시수정).HWP',
+    '이력서(최종)',
+    '이력서(찐최종)',
+    '이력서(찐찐최종)',
+    '이력서(진짜최종이거임최종)',
   ];
 
   const handleGetStarted = () => {

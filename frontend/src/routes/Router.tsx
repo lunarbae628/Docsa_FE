@@ -1,10 +1,9 @@
 import { BrowserRouter, Route, Routes } from "react-router"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
-import DocumentDetailPage from "@/pages/DocumentDetailPage"
+import DocumentWorkspacePage from "@/pages/DocumentWorkspacePage"
 import DocumentsPage from "@/pages/DocumentsPage"
 import LoginPage from "@/pages/LoginPage"
-import MergePage from "@/pages/MergePage"
 import SignupPage from "@/pages/SignupPage"
 import LandingConceptDemoPage from "@/pages/LandingConceptDemoPage"
 import PageLayout from "../layouts/PageLayout"
@@ -31,15 +30,7 @@ export const Router = () => {
             path="/documents/:id"
             element={
               <ProtectedRoute>
-                <DocumentDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/merge"
-            element={
-              <ProtectedRoute>
-                <MergePage />
+                <DocumentWorkspacePage />
               </ProtectedRoute>
             }
           />

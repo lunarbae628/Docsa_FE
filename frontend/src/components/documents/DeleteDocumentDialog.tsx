@@ -9,12 +9,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import type { Document } from "@/mock/DocumentList"
+import type { DocListResponse } from "@/api/__generated__"
 
 interface DeleteDocumentDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  document: Document | null
+  document: DocListResponse | null
   onConfirmDelete: () => void
   onCancel: () => void
 }

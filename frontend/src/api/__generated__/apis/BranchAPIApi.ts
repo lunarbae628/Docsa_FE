@@ -34,7 +34,7 @@ import {
     ErrorResponseToJSON,
 } from '../models/index';
 
-export interface CreateBranchOrSaveRequest {
+export interface CreateBranchRequest {
     documentId: number;
     branchCreateRequest: BranchCreateRequest;
 }
@@ -56,21 +56,21 @@ export interface RenameBranchRequest {
 export class BranchAPIApi extends runtime.BaseAPI {
 
     /**
-     * 새로운 저장을 만듭니다. 직전에 선택한 직전 기록의 종류에 따라 다음을 실행합니다:  - 최신기록에서 이어서 작업할 경우 그 버전에 새로운 저장 생성 - 아니라면 새로운 버전 생성 후 새로운 저장 생성 
-     * 이어서 작업하기
+     * 선택한 기록(fromCommitId)을 기준으로 새로운 브랜치와 작업장(save)을 생성합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
+     * 새 브랜치를 생성합니다.
      */
-    async createBranchOrSaveRaw(requestParameters: CreateBranchOrSaveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BranchCreateResponse>> {
+    async createBranchRaw(requestParameters: CreateBranchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BranchCreateResponse>> {
         if (requestParameters['documentId'] == null) {
             throw new runtime.RequiredError(
                 'documentId',
-                'Required parameter "documentId" was null or undefined when calling createBranchOrSave().'
+                'Required parameter "documentId" was null or undefined when calling createBranch().'
             );
         }
 
         if (requestParameters['branchCreateRequest'] == null) {
             throw new runtime.RequiredError(
                 'branchCreateRequest',
-                'Required parameter "branchCreateRequest" was null or undefined when calling createBranchOrSave().'
+                'Required parameter "branchCreateRequest" was null or undefined when calling createBranch().'
             );
         }
 
@@ -96,11 +96,11 @@ export class BranchAPIApi extends runtime.BaseAPI {
     }
 
     /**
-     * 새로운 저장을 만듭니다. 직전에 선택한 직전 기록의 종류에 따라 다음을 실행합니다:  - 최신기록에서 이어서 작업할 경우 그 버전에 새로운 저장 생성 - 아니라면 새로운 버전 생성 후 새로운 저장 생성 
-     * 이어서 작업하기
+     * 선택한 기록(fromCommitId)을 기준으로 새로운 브랜치와 작업장(save)을 생성합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
+     * 새 브랜치를 생성합니다.
      */
-    async createBranchOrSave(requestParameters: CreateBranchOrSaveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BranchCreateResponse> {
-        const response = await this.createBranchOrSaveRaw(requestParameters, initOverrides);
+    async createBranch(requestParameters: CreateBranchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BranchCreateResponse> {
+        const response = await this.createBranchRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

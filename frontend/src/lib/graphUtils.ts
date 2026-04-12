@@ -43,9 +43,11 @@ export function getBranchColor(branchName: string): string {
 
 // 그래프 레이아웃 상수
 export const GRAPH_LAYOUT = {
-  BRANCH_SPACING: 250,
-  BASE_X_OFFSET: 150,
-  BASE_Y_OFFSET: 150,
-  HEIGHT_RANGE: 450,
-  NODE_WIDTH: 180,
+  BRANCH_SPACING: 280,
+  BASE_X_OFFSET: 80,
+  BASE_Y_OFFSET: 80,
+  ROW_SPACING: 190,
+  WORKSPACE_OFFSET: 170,
+  NODE_WIDTH: 220,
+  NODE_HEIGHT: 112,
 } as const

@@ -13,6 +13,7 @@ import Quote from "@editorjs/quote"
 import Code from "@editorjs/code"
 import Delimiter from "@editorjs/delimiter"
 import Paragraph from "@editorjs/paragraph"
+import { editorDataToMarkdown, markdownToEditorData } from "@/lib/editorMarkdown"
 
 interface DocumentEditorProps {
   isEditable: boolean
@@ -22,11 +23,39 @@ interface DocumentEditorProps {
   onBlur?: () => void
   shouldUpdateOnChange?: boolean // 포커스 상태에 따라 onChange 실행 제어
   disableAutoUpdate?: boolean // initialData 변경 시 자동 업데이트 비활성화
+  enableMarkdownShortcuts?: boolean
+  minimalChrome?: boolean
+  contentLayout?: "full" | "document"
 }
 
 export interface DocumentEditorRef {
   saveData: () => Promise<OutputData | null>
   updateData: (data: OutputData) => Promise<void>
+}
+
+function createOutputData(blocks: OutputData["blocks"]): OutputData {
+  return {
+    time: Date.now(),
+    version: "2.30.8",
+    blocks,
+  }
+}
+
+function getDataSignature(data: OutputData | undefined) {
+  if (!data) return ""
+  return JSON.stringify(data.blocks ?? [])
+}
+
+function isMarkdownShortcutCandidate(text: string) {
+  const normalized = text.replace(/<br\s*\/?>/gi, "\n").trim()
+
+  return (
+    /^(#{1,6})\s+/.test(normalized) ||
+    /^([-*+]|\d+\.)\s+/.test(normalized) ||
+    /^>\s?/.test(normalized) ||
+    /^(-{3,}|\*{3,})$/.test(normalized) ||
+    /^```/.test(normalized)
+  )
 }
 
 const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
@@ -39,6 +68,9 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       onBlur,
       shouldUpdateOnChange = true,
       disableAutoUpdate = false,
+      enableMarkdownShortcuts = false,
+      minimalChrome = false,
+      contentLayout = "full",
     },
     ref,
   ) => {
@@ -46,6 +78,55 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
     const containerRef = useRef<HTMLDivElement>(null)
     const [isReady, setIsReady] = useState(false)
     const shouldUpdateOnChangeRef = useRef(shouldUpdateOnChange)
+    const isApplyingShortcutRef = useRef(false)
+    const lastRenderedDataSignatureRef = useRef("")
+
+    const normalizeBlocksForCompare = useCallback((data: OutputData) => {
+      return JSON.stringify(
+        data.blocks.map((block) => ({
+          type: block.type,
+          data: block.data,
+        })),
+      )
+    }, [])
+
+    const applyMarkdownShortcuts = useCallback(
+      (data: OutputData) => {
+        let hasChanged = false
+
+        const nextBlocks = data.blocks.flatMap((block) => {
+          if (block.type !== "paragraph") {
+            return [block]
+          }
+
+          const paragraphData = createOutputData([block])
+          const paragraphMarkdown = editorDataToMarkdown(paragraphData)
+
+          if (!isMarkdownShortcutCandidate(paragraphMarkdown)) {
+            return [block]
+          }
+
+          const transformedBlocks = markdownToEditorData(paragraphMarkdown).blocks
+
+          if (
+            normalizeBlocksForCompare(paragraphData) ===
+            normalizeBlocksForCompare(createOutputData(transformedBlocks))
+          ) {
+            return [block]
+          }
+
+          hasChanged = true
+          return transformedBlocks
+        })
+
+        if (!hasChanged) {
+          return null
+        }
+
+        return createOutputData(nextBlocks)
+      },
+      [normalizeBlocksForCompare],
+    )
 
     const saveData = useCallback(async (): Promise<OutputData | null> => {
       if (editorRef.current) {
@@ -98,6 +179,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       }
 
       // Initialize Editor.js with default tools
+      lastRenderedDataSignatureRef.current = getDataSignature(initialData)
       const editor = new EditorJS({
         holder: containerRef.current,
         readOnly: !isEditable,
@@ -144,11 +226,29 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           },
         },
         onChange: async () => {
+          if (isApplyingShortcutRef.current) {
+            return
+          }
+
           if (onDataChange && isEditable && shouldUpdateOnChangeRef.current) {
             try {
               const outputData = await editor.save()
+
+              if (enableMarkdownShortcuts) {
+                const transformedData = applyMarkdownShortcuts(outputData)
+
+                if (transformedData) {
+                  isApplyingShortcutRef.current = true
+                  await editor.render(transformedData)
+                  isApplyingShortcutRef.current = false
+                  onDataChange(transformedData)
+                  return
+                }
+              }
+
               onDataChange(outputData)
             } catch (error) {
+              isApplyingShortcutRef.current = false
               console.error("Error saving editor data:", error)
             }
           }
@@ -225,14 +325,20 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           editorRef.current = null
         }
       }
-    }, [isEditable]) // 편집 모드 변경에만 반응
+    }, [isEditable, enableMarkdownShortcuts, normalizeBlocksForCompare]) // 편집 모드 변경에만 반응
 
     // initialData 변경 시 에디터 내용 업데이트 (재생성 없이)
     useEffect(() => {
       if (editorRef.current && isReady && initialData && !disableAutoUpdate) {
+        const nextDataSignature = getDataSignature(initialData)
+        if (lastRenderedDataSignatureRef.current === nextDataSignature) {
+          return
+        }
+
         editorRef.current.render(initialData).catch((error) => {
           console.error("Error updating editor data:", error)
         })
+        lastRenderedDataSignatureRef.current = nextDataSignature
       }
     }, [initialData, isReady, disableAutoUpdate])
 
@@ -258,12 +364,11 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       <div className="w-full h-full">
         <div
           ref={containerRef}
-          className={`
-          h-full
-          min-h-[400px] 
-          border rounded-lg 
-          p-4
-        `}
+          className={`document-editor-shell h-full min-h-full ${
+            contentLayout === "document" ? "document-editor-shell--document" : ""
+          } ${
+            minimalChrome ? "border-0 rounded-none p-0" : "border rounded-lg p-4"
+          }`}
           style={{
             fontSize: "16px",
             lineHeight: "1.6",
@@ -271,8 +376,29 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           onFocusCapture={onFocus}
           onBlurCapture={onBlur}
         />
+        <style>{`
+          .document-editor-shell .codex-editor,
+          .document-editor-shell .codex-editor__redactor {
+            min-height: 100% !important;
+            height: 100% !important;
+            padding-bottom: 0 !important;
+          }
+
+          .document-editor-shell .ce-block__content,
+          .document-editor-shell .ce-toolbar__content {
+            max-width: none !important;
+            margin: 0 20px !important;
+          }
+
+          .document-editor-shell.document-editor-shell--document .ce-block__content,
+          .document-editor-shell.document-editor-shell--document .ce-toolbar__content {
+            max-width: 860px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+          }
+        `}</style>
         {!isReady && (
-          <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex h-full min-h-full items-center justify-center">
             <div className="text-gray-500">에디터를 로딩 중...</div>
           </div>
         )}

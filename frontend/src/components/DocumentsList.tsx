@@ -57,10 +57,12 @@ export default function DocumentsList() {
   const handleDocumentClick = (doc: DocListResponse) => {
     console.log(`문서 ${doc.id} 열기`)
     const { recentType, recentTypeId } = doc.recent || {}
-    if (recentType === "SAVE") {
+    if (recentType === "SAVE" && recentTypeId) {
       navigate(`/documents/${doc.id}?mode=save&saveId=${recentTypeId}`)
-    } else if (recentType === "COMMIT") {
-      navigate(`/documents/${doc.id}?mode=commit&saveId=${recentTypeId}`)
+    } else if (recentType === "COMMIT" && recentTypeId) {
+      navigate(`/documents/${doc.id}?mode=commit&commitId=${recentTypeId}`)
+    } else {
+      navigate(`/documents/${doc.id}`)
     }
   }
 

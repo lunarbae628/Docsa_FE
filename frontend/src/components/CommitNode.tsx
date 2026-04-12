@@ -1,14 +1,7 @@
 import React, { useState } from "react"
+import { Clock3, GitCommitHorizontal } from "lucide-react"
 import { Handle, Position } from "reactflow"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Eye, GitCompare, Play, Trash2, GitMerge } from "lucide-react"
 import type { Commit } from "@/types/graph"
-import { GRAPH_LAYOUT } from "@/lib/graphUtils"
 import CommitTooltip from "@/components/CommitTooltip"
 
 export type CommitNodeMenuType =
@@ -25,6 +18,7 @@ interface CommitNodeProps {
   isCurrentCommit: boolean
   isLastCommit: boolean
   showMergeButton: boolean
+  selectionRole?: "base" | "source" | "target" | null
   onNodeMenuClick: (
     type: CommitNodeMenuType,
     commitId: number,
@@ -34,18 +28,32 @@ interface CommitNodeProps {
   setOpenDropdownId: (id: string | null) => void
 }
 
+const HANDLE_STYLE = {
+  background: "transparent",
+  border: "none",
+  width: 12,
+  height: 12,
+  opacity: 0,
+}
+
+function formatDateLabel(date: string) {
+  return new Date(date).toLocaleString("ko-KR", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 const CommitNode = React.memo(function CommitNode({
   commit,
-  branchName,
   color,
   isCurrentCommit,
   isLastCommit,
   showMergeButton,
+  selectionRole,
   onNodeMenuClick,
-  openDropdownId,
-  setOpenDropdownId,
 }: CommitNodeProps) {
-  // 개별 노드의 hover 상태 관리
   const [hoveredCommit, setHoveredCommit] = useState<{
     commit: Commit
     position: { x: number; y: number }
@@ -53,154 +61,81 @@ const CommitNode = React.memo(function CommitNode({
 
   return (
     <>
-      {/* React Flow Handles for connections */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="right"
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Left}
-        id="left"
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="top"
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="target"
-        position={Position.Right}
-        id="right"
-        style={{ background: "#555" }}
-      />
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="left"
-        style={{ background: "#555" }}
-      />
+      <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
+      <Handle type="source" position={Position.Bottom} style={HANDLE_STYLE} />
 
-      <DropdownMenu
-        open={openDropdownId === commit.id.toString()}
-        onOpenChange={(open) => {
-          setOpenDropdownId(open ? commit.id.toString() : null)
+      <div
+        className={`nodrag nopan group relative w-[228px] rounded-[24px] ${
+          selectionRole === "target"
+            ? "ring-4 ring-emerald-100"
+            : selectionRole
+              ? "ring-4 ring-orange-100"
+              : isCurrentCommit
+                ? "ring-4 ring-sky-100"
+                : ""
+        }`}
+        onMouseEnter={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          setHoveredCommit({
+            commit,
+            position: {
+              x: rect.left + rect.width / 2,
+              y: rect.top - 10,
+            },
+          })
         }}
+        onMouseLeave={() => setHoveredCommit(null)}
       >
-        <DropdownMenuTrigger asChild>
+        <div
+          className={`w-full rounded-[24px] border bg-white px-4 py-3.5 text-left shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-colors ${
+            selectionRole === "target"
+              ? "border-emerald-500 bg-emerald-50/40"
+              : selectionRole
+                ? "border-orange-400 bg-orange-50/40"
+                : isCurrentCommit
+              ? "border-sky-500 bg-sky-50/40"
+              : "border-slate-200 group-hover:border-slate-300"
+          }`}
+        >
           <div
-            className={`relative p-3 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${
-              isCurrentCommit ? "bg-yellow-50 hover:bg-yellow-100" : ""
-            }`}
-            style={{ width: GRAPH_LAYOUT.NODE_WIDTH }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onMouseEnter={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              setHoveredCommit({
-                commit,
-                position: {
-                  x: rect.left,
-                  y: rect.bottom + 8,
-                },
-              })
-            }}
-            onMouseLeave={() => setHoveredCommit(null)}
+            className="mb-3 h-1.5 w-12 rounded-full"
+            style={{ backgroundColor: color }}
+          />
+          <div className="flex items-start gap-3">
+          <div
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border"
+            style={{ backgroundColor: `${color}12`, color, borderColor: `${color}26` }}
           >
-            <div className="font-semibold text-sm truncate">{commit.title}</div>
-            <div className="text-xs text-gray-600 mt-1 truncate">
-              {commit.description}
+            <GitCommitHorizontal className="h-4.5 w-4.5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[15px] font-semibold tracking-[-0.03em] text-slate-900">
+              {commit.title}
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {new Date(commit.createdAt).toLocaleString()}
+            {selectionRole ? (
+              <div
+                className={`mt-1 inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold ${
+                  selectionRole === "target"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-orange-100 text-orange-700"
+                }`}
+              >
+                {selectionRole === "target" ? "선택 대상" : "기준"}
+              </div>
+            ) : null}
+            <div className="mt-1 line-clamp-2 text-[13px] leading-5 text-slate-500">
+              {commit.description || "기록된 변경사항"}
             </div>
-            <div
-              className="text-xs mt-2 px-2 py-1 rounded-full inline-block text-white"
-              style={{ backgroundColor: color }}
-            >
-              {branchName}
+            <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <Clock3 className="h-3.5 w-3.5" />
+              {formatDateLabel(commit.createdAt)}
             </div>
           </div>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-44" alignOffset={80}>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              onNodeMenuClick("commit-view", commit.id, isLastCommit)
-              setOpenDropdownId(null)
-            }}
-            className="cursor-pointer"
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            문서보기
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              onNodeMenuClick("commit-compare", commit.id, isLastCommit)
-              setOpenDropdownId(null)
-            }}
-            className="cursor-pointer"
-          >
-            <GitCompare className="h-4 w-4 mr-2" />
-            비교하기
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              onNodeMenuClick("commit-continueEdit", commit.id, isLastCommit)
-              setOpenDropdownId(null)
-            }}
-            className="cursor-pointer"
-          >
-            <Play className="h-4 w-4 mr-2" />
-            이어서 작업하기
-          </DropdownMenuItem>
-          {showMergeButton && (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation()
-                onNodeMenuClick("commit-merge", commit.id, isLastCommit)
-                setOpenDropdownId(null)
-              }}
-              className="cursor-pointer text-green-600 focus:text-green-600"
-            >
-              <GitMerge className="h-4 w-4 mr-2" />
-              여기로 병합하기
-            </DropdownMenuItem>
-          )}
-          {isLastCommit && (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation()
-                onNodeMenuClick("commit-delete", commit.id, isLastCommit)
-                setOpenDropdownId(null)
-              }}
-              className="cursor-pointer text-red-600 focus:text-red-600"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              삭제하기
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </div>
+        </div>
+      </div>
 
-      {/* 개별 노드의 Tooltip */}
-      {!openDropdownId && <CommitTooltip hoveredCommit={hoveredCommit} />}
+      <CommitTooltip hoveredCommit={hoveredCommit} />
     </>
   )
 })

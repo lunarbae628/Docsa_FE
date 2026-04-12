@@ -2,8 +2,9 @@ import { useQueryClient, useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { alertDialog } from "@/lib/utils"
-import type { Document } from "@/mock/DocumentList"
+import { getApiErrorMessage } from "@/lib/apiError"
 import { apiClient } from "@/api/apiClient"
+import type { DocListResponse } from "@/api/__generated__"
 
 export function useDeleteDocument() {
   const { user } = useAuth()
@@ -11,7 +12,7 @@ export function useDeleteDocument() {
 
   // 삭제 다이얼로그 관련 상태
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(
+  const [documentToDelete, setDocumentToDelete] = useState<DocListResponse | null>(
     null,
   )
 
@@ -34,7 +35,10 @@ export function useDeleteDocument() {
       console.error("문서 삭제 실패:", error)
 
       // 서버에서 내려온 에러 메시지 추출
-      const errorMessage = error.message || "문서 삭제에 실패했습니다.";
+      const errorMessage = await getApiErrorMessage(
+        error,
+        "문서 삭제에 실패했습니다.",
+      )
       
       console.log("errorMessage", errorMessage)
 
@@ -44,7 +48,7 @@ export function useDeleteDocument() {
   })
 
   // 삭제 요청 함수 (다이얼로그 열기)
-  const deleteDocument = (document: Document) => {
+  const deleteDocument = (document: DocListResponse) => {
     setDocumentToDelete(document)
     setShowDeleteDialog(true)
   }

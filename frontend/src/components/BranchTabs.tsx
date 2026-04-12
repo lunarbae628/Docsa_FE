@@ -1,6 +1,6 @@
-import { useState, type MouseEvent } from "react"
-import { X, GitBranch, Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useMemo, useState, type MouseEvent } from "react"
+import { ChevronDown, GitBranch, PencilLine, X } from "lucide-react"
+import { getBranchColor } from "@/lib/graphUtils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,6 +11,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import type { Branch, Commit } from "@/types/graph"
 
 interface BranchTabsProps {
@@ -19,6 +29,7 @@ interface BranchTabsProps {
   currentBranchId?: number
   onBranchSelect?: (branchId: number) => void
   onBranchDelete?: (branchId: number) => void
+  onBranchRename?: (branchId: number, newName: string) => void | Promise<void>
   onBranchCreate?: () => void
 }
 
@@ -33,7 +44,9 @@ export default function BranchTabs({
   branches,
   commits,
   currentBranchId,
+  onBranchSelect,
   onBranchDelete,
+  onBranchRename,
 }: BranchTabsProps) {
   const [deleteDialog, setDeleteDialog] = useState<DeleteConfirmDialog>({
     isOpen: false,
@@ -41,6 +54,22 @@ export default function BranchTabs({
     commitCount: 0,
     isMerged: false,
   })
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameValue, setRenameValue] = useState("")
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameTargetBranch, setRenameTargetBranch] = useState<Branch | null>(null)
+
+  const currentBranch = useMemo(
+    () =>
+      branches.find((branch) => branch.id === currentBranchId) ?? branches[0] ?? null,
+    [branches, currentBranchId],
+  )
+
+  useEffect(() => {
+    if (renameOpen && renameTargetBranch) {
+      setRenameValue(renameTargetBranch.name)
+    }
+  }, [renameOpen, renameTargetBranch])
 
   const getBranchCommitCount = (branchId: number) => {
     return commits.filter((commit) => commit.branchId === branchId).length
@@ -60,7 +89,10 @@ export default function BranchTabs({
     branch: Branch,
   ) => {
     e.stopPropagation()
+    openDeleteDialog(branch)
+  }
 
+  const openDeleteDialog = (branch: Branch) => {
     // 메인 브랜치는 삭제 불가
     if (branch.name === "main") {
       return
@@ -94,68 +126,171 @@ export default function BranchTabs({
     })
   }
 
-  const getBranchColor = (branchId: number) => {
-    // 간단한 색상 매핑 (실제로는 더 체계적인 색상 시스템 사용)
-    const colors = [
-      "#3b82f6", // blue
-      "#10b981", // emerald
-      "#f59e0b", // amber
-      "#ef4444", // red
-      "#8b5cf6", // violet
-      "#06b6d4", // cyan
-    ]
-    return colors[branchId % colors.length]
+  const handleRenameConfirm = async () => {
+    if (
+      !renameTargetBranch ||
+      !renameValue.trim() ||
+      renameTargetBranch.name === "main"
+    ) {
+      return
+    }
+
+    setIsRenaming(true)
+    try {
+      await Promise.resolve(
+        onBranchRename?.(renameTargetBranch.id, renameValue.trim()),
+      )
+      setRenameOpen(false)
+      setRenameTargetBranch(null)
+    } finally {
+      setIsRenaming(false)
+    }
   }
 
   return (
     <>
-      <div className="flex items-center gap-2 p-3 bg-gray-50 border-b border-gray-200 overflow-scroll">
-        <GitBranch className="h-4 w-4 text-gray-600" />
-        <span className="flex-shrink-0 text-sm font-medium text-gray-700">
-          버전:
-        </span>
-
-        <div className="flex items-center gap-1 flex-1">
-          {branches.map((branch) => {
-            const isActive = branch.id === currentBranchId
-            const isMain = branch.name === "main"
-            const canDelete = !isMain && branch.id !== currentBranchId
-            const commitCount = getBranchCommitCount(branch.id)
-
-            return (
-              <div
-                key={branch.id}
-                className={`
-                  flex items-center gap-1 px-3 py-1.5 rounded-full text-sm cursor-pointer
-                  transition-colors group
-                  ${
-                    isActive
-                      ? "bg-blue-100 text-blue-800 border border-blue-200"
-                      : "bg-white hover:bg-gray-100 border border-gray-200"
-                  }
-                `}
+      <div className="border-b border-slate-200/90 bg-white/80 px-4 py-3 backdrop-blur">
+        <div className="flex items-center gap-2">
+          <GitBranch className="h-4 w-4 text-slate-500" />
+          <span className="text-sm font-medium text-slate-700">브랜치</span>
+          <div className="ml-auto flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-11 min-w-[220px] items-center gap-2 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fdfefe_0%,#f8fafc_100%)] px-3.5 text-sm text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.06)] transition hover:border-slate-300"
+                >
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{
+                      backgroundColor: currentBranch
+                        ? getBranchColor(currentBranch.name)
+                        : "#94a3b8",
+                    }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-left font-medium">
+                    {currentBranch?.name ?? "브랜치 선택"}
+                  </span>
+                  {currentBranch ? (
+                    <span className="text-xs text-slate-400">
+                      ({getBranchCommitCount(currentBranch.id)})
+                    </span>
+                  ) : null}
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-[260px] rounded-2xl border-slate-200 p-2 shadow-[0_16px_40px_rgba(15,23,42,0.12)]"
               >
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: getBranchColor(branch.id) }}
-                />
-                <span className="font-medium">{branch.name}</span>
-                <span className="text-xs text-gray-500">({commitCount})</span>
+                {branches.map((branch) => {
+                  const isActive = branch.id === currentBranchId
+                  const commitCount = getBranchCommitCount(branch.id)
+                  const canRename = branch.name !== "main"
+                  const canDelete =
+                    branch.name !== "main" && branch.id !== currentBranchId
 
-                {canDelete && (
-                  <button
-                    className="ml-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded-full p-0.5 transition-all"
-                    onClick={(e) => handleDeleteClick(e, branch)}
-                    title={`${branch.name} 버전 삭제`}
-                  >
-                    <X className="h-3 w-3 text-red-600" />
-                  </button>
-                )}
-              </div>
-            )
-          })}
+                  return (
+                    <DropdownMenuItem
+                      key={branch.id}
+                      onClick={() => onBranchSelect?.(branch.id)}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 focus:bg-slate-50"
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: getBranchColor(branch.name) }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-slate-800">
+                          {branch.name}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          기록 {commitCount}개
+                        </span>
+                      </span>
+                      {isActive ? (
+                        <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white">
+                          현재
+                        </span>
+                      ) : null}
+                      <div className="ml-1 flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30"
+                          disabled={!canRename}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setRenameTargetBranch(branch)
+                            setRenameOpen(true)
+                          }}
+                          title={`${branch.name} 이름 변경`}
+                        >
+                          <PencilLine className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md p-1 text-red-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                          disabled={!canDelete}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openDeleteDialog(branch)
+                          }}
+                          title={`${branch.name} 삭제`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
+
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>브랜치 이름 변경</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="branchRename">브랜치 이름</Label>
+              <Input
+                id="branchRename"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder="브랜치 이름을 입력하세요"
+                disabled={isRenaming || renameTargetBranch?.name === "main"}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRenameOpen(false)}
+                disabled={isRenaming}
+              >
+                취소
+              </Button>
+              <Button
+                type="button"
+                onClick={handleRenameConfirm}
+                disabled={
+                  isRenaming ||
+                  !renameValue.trim() ||
+                  !renameTargetBranch ||
+                  renameTargetBranch.name === "main"
+                }
+              >
+                {isRenaming ? "변경 중..." : "변경하기"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* 삭제 확인 다이얼로그 */}
       <AlertDialog

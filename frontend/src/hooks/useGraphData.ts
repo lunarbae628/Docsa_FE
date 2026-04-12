@@ -80,6 +80,45 @@ function transformEdgeDto(dto: EdgeDto) {
   }
 }
 
+function buildRenderableCommitEdges(data: GraphDataType) {
+  const edgeKeys = new Set(data.edges.map((edge) => `${edge.from}-${edge.to}`))
+  const commitIds = new Set(data.commits.map((commit) => commit.id))
+  const edges = [...data.edges]
+
+  for (const branch of data.branches) {
+    if (branch.mergeTargetCommitId == null) {
+      continue
+    }
+
+    const mergeResultCommitId = branch.rootCommitId ?? branch.leafCommitId
+    if (mergeResultCommitId == null || !commitIds.has(mergeResultCommitId)) {
+      continue
+    }
+
+    const originCommitIds = [
+      branch.fromCommitId,
+      branch.mergeTargetCommitId,
+    ].filter(
+      (commitId): commitId is number =>
+        commitId != null &&
+        commitId !== mergeResultCommitId &&
+        commitIds.has(commitId),
+    )
+
+    for (const originCommitId of [...new Set(originCommitIds)]) {
+      const edgeKey = `${originCommitId}-${mergeResultCommitId}`
+      if (edgeKeys.has(edgeKey)) {
+        continue
+      }
+
+      edgeKeys.add(edgeKey)
+      edges.push({ from: originCommitId, to: mergeResultCommitId })
+    }
+  }
+
+  return edges
+}
+
 // React Flow 렌더링을 위한 데이터 변환 훅 (기존 useGraphData에서 이름 변경)
 export function useGraphRender({
   data,
@@ -87,6 +126,8 @@ export function useGraphRender({
   activeSaveId,
   isMainBranchLeafCommit,
 }: UseGraphRenderProps) {
+  const renderableCommitEdges = useMemo(() => buildRenderableCommitEdges(data), [data])
+
   // 커밋을 React Flow 노드로 변환
   const { commitNodes, infoByBranch, commitDepths } = useMemo(() => {
     // 브랜치별 정보 수집용
@@ -111,7 +152,7 @@ export function useGraphRender({
       let changed = true
       while (changed) {
         changed = false
-        for (const edge of data.edges) {
+        for (const edge of renderableCommitEdges) {
           const sourceDepth = commitDepths.get(edge.from)
           const targetDepth = commitDepths.get(edge.to)
 
@@ -191,11 +232,11 @@ export function useGraphRender({
     })
 
     return { commitNodes: nodes, infoByBranch, commitDepths }
-  }, [data, activeCommitId, isMainBranchLeafCommit])
+  }, [activeCommitId, data, isMainBranchLeafCommit, renderableCommitEdges])
 
   // 엣지를 React Flow 엣지로 변환
   const commitEdges = useMemo<Edge[]>(() => {
-    return data.edges.map((edge) => {
+    return renderableCommitEdges.map((edge) => {
       // 소스와 타겟이 같은 브랜치인지 확인
       const sourceCommit = data.commits.find((c) => c.id === edge.from)
       const targetCommit = data.commits.find((c) => c.id === edge.to)
@@ -217,7 +258,7 @@ export function useGraphRender({
         },
       }
     })
-  }, [data, commitDepths])
+  }, [data, renderableCommitEdges])
 
   const { tempNodes, tempEdges } = useMemo<{
     tempNodes: GraphNode[]

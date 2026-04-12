@@ -90,12 +90,23 @@ function updateGraphCacheAfterCommitCreate(
   const targetBranch = graphData.branches.find((branch) => branch.id === branchId)
   const previousCommitId = targetBranch?.leafCommitId ?? null
 
-  const nextEdges =
-    previousCommitId && previousCommitId !== commit.id
-      ? [...graphData.edges, { from: previousCommitId, to: commit.id }]
-      : targetBranch?.fromCommitId
-        ? [...graphData.edges, { from: targetBranch.fromCommitId, to: commit.id }]
-        : graphData.edges
+  const nextEdges = [...graphData.edges]
+  const edgeKeys = new Set(nextEdges.map((edge) => `${edge.from}-${edge.to}`))
+
+  const addEdge = (fromCommitId: number | null | undefined) => {
+    if (!fromCommitId || fromCommitId === commit.id) return
+    const edgeKey = `${fromCommitId}-${commit.id}`
+    if (edgeKeys.has(edgeKey)) return
+    edgeKeys.add(edgeKey)
+    nextEdges.push({ from: fromCommitId, to: commit.id })
+  }
+
+  if (previousCommitId && previousCommitId !== commit.id) {
+    addEdge(previousCommitId)
+  } else {
+    addEdge(targetBranch?.fromCommitId)
+    addEdge(targetBranch?.mergeTargetCommitId)
+  }
 
   return {
     ...graphData,

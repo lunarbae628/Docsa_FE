@@ -15,7 +15,6 @@ interface DocumentMergeViewProps {
   title?: string
   baseLabel?: string
   targetLabel?: string
-  initialMergedData?: OutputData
   className?: string
 }
 
@@ -406,6 +405,58 @@ function decisionKey(row: MergeRow, regionIndex: number | null) {
   return `${row.key}:${regionIndex ?? "block"}`
 }
 
+function buildCommonBlock(row: MergeRow, decisions: Record<string, MergeDecision>) {
+  if (row.status === "same") {
+    const commonBlock = row.rightBlock ?? row.leftBlock
+    return commonBlock ? cloneData(commonBlock) : null
+  }
+
+  const wholeDecision = decisions[decisionKey(row, null)]
+  if (wholeDecision === "left" && row.leftBlock) return cloneData(row.leftBlock)
+  if (wholeDecision === "right" && row.rightBlock) return cloneData(row.rightBlock)
+
+  if (
+    !row.leftBlock ||
+    !row.rightBlock ||
+    !isEditableTextBlock(row.leftBlock) ||
+    !isEditableTextBlock(row.rightBlock)
+  ) {
+    return null
+  }
+
+  const leftText = getVisibleBlockText(row.leftBlock)
+  const rightText = getVisibleBlockText(row.rightBlock)
+  const segments = buildDiffSegments(leftText, rightText)
+  const nextText = segments
+    .map((segment) => {
+      if (segment.type === "equal") return segment.text
+
+      const decision = decisions[decisionKey(row, segment.regionIndex)]
+      if (decision === "left") return segment.leftText
+      if (decision === "right") return segment.rightText
+
+      return ""
+    })
+    .join("")
+
+  if (!nextText.replace(/\s+/g, "")) {
+    return null
+  }
+
+  return setBlockText(row.rightBlock, nextText)
+}
+
+function buildMergedDataFromDecisions(
+  rows: MergeRow[],
+  decisions: Record<string, MergeDecision>,
+) {
+  const blocks = rows
+    .map((row) => buildCommonBlock(row, decisions))
+    .filter((block): block is EditorBlock => Boolean(block))
+
+  return createOutputData(blocks)
+}
+
 function PaneBlock({
   row,
   side,
@@ -555,14 +606,11 @@ export default function DocumentMergeView({
   title = "기록 병합",
   baseLabel = "병합 원본",
   targetLabel = "병합 대상",
-  initialMergedData,
   className,
 }: DocumentMergeViewProps) {
   const editorRef = useRef<DocumentEditorRef>(null)
-  const baselineData = useMemo(
-    () => cloneData(initialMergedData ?? targetData),
-    [initialMergedData, targetData],
-  )
+  const rows = useMemo(() => buildMergeRows(baseData, targetData), [baseData, targetData])
+  const baselineData = useMemo(() => buildMergedDataFromDecisions(rows, {}), [rows])
   const [mergedData, setMergedData] = useState<OutputData>(cloneData(baselineData))
   const [decisions, setDecisions] = useState<Record<string, MergeDecision>>({})
 
@@ -571,10 +619,9 @@ export default function DocumentMergeView({
     setDecisions({})
   }, [baselineData])
 
-  const rows = useMemo(() => buildMergeRows(baseData, targetData), [baseData, targetData])
-
   const applyWholeDocument = async (side: "left" | "right") => {
     const nextData = cloneData(side === "left" ? baseData : targetData)
+    setDecisions({})
     setMergedData(nextData)
     await editorRef.current?.updateData(nextData)
   }
@@ -710,12 +757,16 @@ export default function DocumentMergeView({
       return next
     })
 
-    if (!nextDecision) {
-      await restoreWholeRow(row)
-      return
+    const nextDecisions = { ...decisions }
+    if (nextDecision) {
+      nextDecisions[key] = nextDecision
+    } else {
+      delete nextDecisions[key]
     }
 
-    await applyWholeRow(row, nextDecision)
+    const nextData = buildMergedDataFromDecisions(rows, nextDecisions)
+    setMergedData(nextData)
+    await editorRef.current?.updateData(nextData)
   }
 
   const handleRegionToggle = async (
@@ -737,12 +788,16 @@ export default function DocumentMergeView({
       return next
     })
 
-    if (!nextDecision) {
-      await restoreRegion(row, regionIndex)
-      return
+    const nextDecisions = { ...decisions }
+    if (nextDecision) {
+      nextDecisions[key] = nextDecision
+    } else {
+      delete nextDecisions[key]
     }
 
-    await applyRegion(row, nextDecision, regionIndex)
+    const nextData = buildMergedDataFromDecisions(rows, nextDecisions)
+    setMergedData(nextData)
+    await editorRef.current?.updateData(nextData)
   }
 
   const handleSave = async () => {
@@ -759,7 +814,7 @@ export default function DocumentMergeView({
             {title}
           </div>
           <div className="mt-1 text-xs text-slate-500">
-            좌우 문서 안에서 색으로 표시된 차이를 직접 눌러 가운데 결과를 조립합니다. 같은 표시를 다시 누르면 기준 상태로 원복됩니다.
+            가운데에는 공통 기반만 먼저 표시됩니다. 좌우 차이를 선택해 결과를 완성하세요.
           </div>
         </div>
 
@@ -798,9 +853,9 @@ export default function DocumentMergeView({
 
         <div className="min-h-0 border-x border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-5 py-4">
-            <div className="text-sm font-semibold text-slate-900">병합 결과</div>
+            <div className="text-sm font-semibold text-slate-900">공통 기반</div>
             <div className="mt-1 text-xs text-slate-500">
-              공통 내용은 그대로 유지되고, 선택한 차이만 현재 문서에 반영됩니다.
+              선택한 차이만 이 결과에 추가됩니다.
             </div>
           </div>
           <div className="h-full min-h-0 overflow-auto">

@@ -312,7 +312,7 @@ export function useDocumentWorkspaceActions({
 }: UseDocumentWorkspaceActionsParams) {
   const queryClient = useQueryClient()
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced")
-  const [toast, setToast] = useState("작업장에서 문서를 편집 중입니다.")
+  const [toast, setToast] = useState("")
   const [branchEditState, setBranchEditState] = useState<BranchEditState>(null)
   const [mergeBranchState, setMergeBranchState] = useState<MergeBranchState>(null)
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null)
@@ -361,11 +361,11 @@ export function useDocumentWorkspaceActions({
             nextBlocks,
           )
           setSyncStatus("synced")
-          setToast("작업장 변경사항이 자동 저장되었습니다.")
+          setToast("자동 저장됨")
         } catch (error: any) {
           setSyncStatus("idle")
           await alertDialog(
-            await getApiErrorMessage(error, "작업장 자동 저장에 실패했습니다."),
+            await getApiErrorMessage(error, "워크스페이스 자동 저장에 실패했습니다."),
             "오류",
             "destructive",
           )
@@ -414,7 +414,7 @@ export function useDocumentWorkspaceActions({
         })
         await refreshDocumentState(nextParams, false)
         setSearchParams(nextParams, { replace: true })
-        setToast(`기록 '${title}'을 남기고 작업장을 그대로 유지했습니다.`)
+        setToast("기록 생성됨")
       } catch (error: any) {
         await alertDialog(
           await getApiErrorMessage(error, "기록 생성에 실패했습니다."),
@@ -475,7 +475,7 @@ export function useDocumentWorkspaceActions({
         setBranchEditState(null)
 
         if (!result.saveId) {
-          throw new Error("작업장을 만들지 못했습니다.")
+          throw new Error("워크스페이스를 만들지 못했습니다.")
         }
 
         if (result.branchId) {
@@ -499,7 +499,7 @@ export function useDocumentWorkspaceActions({
         })
         await refreshDocumentState(nextParams, false)
         setSearchParams(nextParams, { replace: true })
-        setToast(`${branchName} 작업장을 열었습니다.`)
+        setToast("워크스페이스 열림")
       } catch (error: any) {
         await alertDialog(
           await getApiErrorMessage(error, "이어서 작업하기에 실패했습니다."),
@@ -531,7 +531,7 @@ export function useDocumentWorkspaceActions({
         compareKind: null,
         compareId: null,
       })
-      setToast("그래프에서 비교할 다른 기록이나 작업장을 고르세요.")
+      setToast("비교 대상 선택")
     },
     [setView],
   )
@@ -551,7 +551,7 @@ export function useDocumentWorkspaceActions({
           compareId: id,
         }
       })
-      setToast("두 버전을 나란히 비교 중입니다.")
+      setToast("비교 중")
     },
     [setView],
   )
@@ -566,7 +566,7 @@ export function useDocumentWorkspaceActions({
         targetKind: null,
         targetId: null,
       })
-      setToast("그래프에서 병합할 대상 브랜치의 기록이나 작업장을 고르세요.")
+      setToast("병합 대상 선택")
     },
     [setView],
   )
@@ -586,7 +586,7 @@ export function useDocumentWorkspaceActions({
           targetId: id,
         }
       })
-      setToast("병합 결과를 확인한 뒤 적용할 수 있습니다.")
+      setToast("병합 미리보기")
     },
     [setView],
   )
@@ -691,7 +691,7 @@ export function useDocumentWorkspaceActions({
           queryKey: ["graphData", documentId],
           type: "active",
         })
-        setToast(`${targetBranch.name} 브랜치를 삭제하고 main 작업장으로 돌아왔습니다.`)
+        setToast("브랜치 삭제됨")
       } catch (error: any) {
         await alertDialog(
           await getApiErrorMessage(error, "브랜치 삭제에 실패했습니다."),
@@ -758,7 +758,7 @@ export function useDocumentWorkspaceActions({
         })
 
         if (!mergeResult.saveId || !mergeResult.branchId) {
-          throw new Error("병합 작업장을 만들지 못했습니다.")
+          throw new Error("병합 워크스페이스를 만들지 못했습니다.")
         }
 
         const mergedBlocks = (mergedData.blocks ?? []) as SnapshotBlock[]
@@ -786,7 +786,7 @@ export function useDocumentWorkspaceActions({
         })
         await refreshDocumentState(nextParams, false)
         setSearchParams(nextParams, { replace: true })
-        setToast(`${mergeBranchName} 작업장을 새로 만들었습니다.`)
+        setToast("병합 워크스페이스 생성됨")
         setMergeBranchState(null)
       } catch (error: any) {
         await alertDialog(
@@ -870,7 +870,7 @@ export function useDocumentWorkspaceActions({
           const branch = branches.find((item) => item.saveId === targetId)
           if (!branch) return
           openWorkspaceByBranch(branch.id)
-          setToast(`${branch.name} 작업장을 열었습니다.`)
+          setToast("워크스페이스 열림")
         }
       }
     },

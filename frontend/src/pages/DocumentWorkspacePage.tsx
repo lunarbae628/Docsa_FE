@@ -1,4 +1,31 @@
-import { useEffect, useState } from "react"
+import BranchEditModal from "@/components/BranchEditModal"
+import DocumentCompareView from "@/components/DocumentCompareView"
+import DocumentEditor from "@/components/DocumentEditor"
+import DocumentMergeView from "@/components/DocumentMergeView"
+import DocumentSidebarQuickMenu from "@/components/DocumentSidebarQuickMenu"
+import DocumentWorkspaceGraphPanel from "@/components/DocumentWorkspaceGraphPanel"
+import SaveCommitModal from "@/components/SaveCommitModal"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { useDocumentContent } from "@/hooks/useDocumentContent"
+import { useDocumentWorkspaceActions } from "@/hooks/useDocumentWorkspaceActions"
+import {
+  createOutputData,
+  useDocumentWorkspaceBodyState,
+} from "@/hooks/useDocumentWorkspaceBodyState"
+import { useDocumentWorkspaceGraphState } from "@/hooks/useDocumentWorkspaceGraphState"
+import { useDocumentWorkspaceReviewState } from "@/hooks/useDocumentWorkspaceReviewState"
+import ResizableLayout from "@/layouts/ResizableLayout"
+import type { GraphDataType } from "@/types/graph"
 import {
   CircleCheck,
   CloudOff,
@@ -10,34 +37,8 @@ import {
   Trash2,
   X,
 } from "lucide-react"
+import { useEffect, useState } from "react"
 import { useParams, useSearchParams } from "react-router"
-import ResizableLayout from "@/layouts/ResizableLayout"
-import DocumentWorkspaceGraphPanel from "@/components/DocumentWorkspaceGraphPanel"
-import DocumentCompareView from "@/components/DocumentCompareView"
-import DocumentEditor from "@/components/DocumentEditor"
-import DocumentMergeView from "@/components/DocumentMergeView"
-import BranchEditModal from "@/components/BranchEditModal"
-import SaveCommitModal from "@/components/SaveCommitModal"
-import { Button } from "@/components/ui/button"
-import { useDocumentWorkspaceGraphState } from "@/hooks/useDocumentWorkspaceGraphState"
-import { useDocumentContent } from "@/hooks/useDocumentContent"
-import {
-  createOutputData,
-  useDocumentWorkspaceBodyState,
-} from "@/hooks/useDocumentWorkspaceBodyState"
-import { useDocumentWorkspaceReviewState } from "@/hooks/useDocumentWorkspaceReviewState"
-import { useDocumentWorkspaceActions } from "@/hooks/useDocumentWorkspaceActions"
-import type { GraphDataType } from "@/types/graph"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
 function useDelayedFlag(value: boolean, delayMs = 180) {
   const [isDelayed, setIsDelayed] = useState(false)
@@ -118,7 +119,11 @@ function WorkspaceAutosaveStatus({
         <CloudOff className="h-4 w-4" />
       )}
       <span className="whitespace-nowrap">
-        {isSyncing ? "작업장 저장 중" : isSynced ? "작업장 저장됨" : "저장 확인 필요"}
+        {isSyncing
+          ? "워크스페이스 저장 중"
+          : isSynced
+            ? "워크스페이스 저장됨"
+            : "저장 확인 필요"}
       </span>
     </div>
   )
@@ -285,7 +290,7 @@ export default function DocumentWorkspacePage() {
 
   const rightTitle =
     view.mode === "workspace"
-      ? `${currentBranch?.name ?? "branch"} 작업장`
+      ? `${currentBranch?.name ?? "branch"} 워크스페이스`
       : view.mode === "compare"
         ? "기록 비교"
         : view.mode === "merge"
@@ -422,31 +427,34 @@ export default function DocumentWorkspacePage() {
 
           <div className="h-full min-h-0 bg-slate-100 p-3">
             <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">
-                    {rightTitle}
-                  </p>
-                  {view.mode === "commit" && currentCommit ? (
-                    <p className="truncate text-xs text-slate-500">
-                      {currentCommit.title}
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <DocumentSidebarQuickMenu currentDocumentId={documentId} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">
+                      {rightTitle}
                     </p>
-                  ) : null}
-                  {view.mode === "compare" && compareBaseItem ? (
-                    <p className="truncate text-xs text-slate-500">
-                      {compareBaseItem.title} 기준 비교
-                    </p>
-                  ) : null}
-                  {view.mode === "merge" && mergeSourceItem ? (
-                    <p className="truncate text-xs text-slate-500">
-                      {mergeTargetItem
-                        ? `${mergeSourceItem.title} -> ${mergeTargetItem.title}`
-                        : `${mergeSourceItem.title} 기준 병합`}
-                    </p>
-                  ) : null}
-                  {view.mode === "workspace" ? (
-                    <p className="truncate text-xs text-slate-500">{toast}</p>
-                  ) : null}
+                    {view.mode === "commit" && currentCommit ? (
+                      <p className="truncate text-xs text-slate-500">
+                        {currentCommit.title}
+                      </p>
+                    ) : null}
+                    {view.mode === "compare" && compareBaseItem ? (
+                      <p className="truncate text-xs text-slate-500">
+                        {compareBaseItem.title} 기준 비교
+                      </p>
+                    ) : null}
+                    {view.mode === "merge" && mergeSourceItem ? (
+                      <p className="truncate text-xs text-slate-500">
+                        {mergeTargetItem
+                          ? `${mergeSourceItem.title} -> ${mergeTargetItem.title}`
+                          : `${mergeSourceItem.title} 기준 병합`}
+                      </p>
+                    ) : null}
+                    {view.mode === "workspace" && toast ? (
+                      <p className="truncate text-xs text-slate-500">{toast}</p>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {view.mode === "workspace" ? (
@@ -544,12 +552,6 @@ export default function DocumentWorkspacePage() {
                 </div>
               </div>
 
-              {view.mode !== "workspace" ? (
-                <div className="border-b border-slate-200 bg-slate-50 px-5 py-2 text-xs text-slate-500">
-                  {toast}
-                </div>
-              ) : null}
-
               <div
                 className={`flex-1 overflow-auto ${
                   view.mode === "compare" ? "bg-slate-50 p-4" : "bg-white px-5 py-4"
@@ -570,11 +572,11 @@ export default function DocumentWorkspacePage() {
                     </div>
                   ) : directSelectedContent.error ? (
                     <div className="flex h-full min-h-[760px] items-center justify-center text-sm text-red-500">
-                      선택한 작업장을 불러오지 못했습니다.
+                      선택한 워크스페이스를 불러오지 못했습니다.
                     </div>
                   ) : (
                     <DocumentPendingCanvas
-                      label="작업장 내용을 준비하는 중"
+                      label="워크스페이스 준비 중"
                       visible={showDirectContentPending}
                     />
                   )
@@ -609,7 +611,6 @@ export default function DocumentWorkspacePage() {
                       <DocumentMergeView
                         baseData={mergeSourceData}
                         targetData={mergeTargetData}
-                        initialMergedData={mergeTargetData}
                         baseLabel={mergeSourceItem?.title ?? "병합 원본"}
                         targetLabel={mergeTargetItem?.title ?? "병합 대상"}
                         title="기록 병합"
@@ -630,7 +631,7 @@ export default function DocumentWorkspacePage() {
                             {mergeSourceItem?.title ?? "병합 원본"}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            기준 문서를 먼저 확인하고, 그래프에서 병합 대상을 선택하세요.
+                            그래프에서 병합 대상을 선택하세요.
                           </p>
                         </div>
                         <div className="h-full min-h-[680px]">
@@ -648,8 +649,7 @@ export default function DocumentWorkspacePage() {
                           병합할 대상을 선택하세요
                         </p>
                         <p className="mt-2 text-sm leading-6 text-slate-500">
-                          왼쪽 기준 문서는 그대로 유지되어 있습니다. 그래프에서 다른 기록이나
-                          작업장을 고르면 병합 화면이 이어서 열립니다.
+                          그래프에서 다른 기록이나 워크스페이스를 선택하세요.
                         </p>
                       </div>
                     </div>
@@ -685,8 +685,7 @@ export default function DocumentWorkspacePage() {
                           {compareBaseItem?.title ?? "비교 기준"}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          기준 문서를 먼저 보여줍니다. 그래프에서 비교 대상을 선택하면 바로
-                          나란히 비교됩니다.
+                          그래프에서 비교 대상을 선택하세요.
                         </p>
                       </div>
                       <div className="h-full min-h-[680px]">
@@ -704,8 +703,7 @@ export default function DocumentWorkspacePage() {
                         비교 대상을 선택하세요
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-500">
-                        왼쪽 기준 문서는 그대로 유지되어 있습니다. 그래프에서 다른 기록이나
-                        작업장을 고르면 텍스트 차이를 바로 비교합니다.
+                        그래프에서 다른 기록이나 워크스페이스를 선택하세요.
                       </p>
                     </div>
                   </div>
@@ -751,7 +749,7 @@ export default function DocumentWorkspacePage() {
         isLoading={isActionPending}
         defaultBranchName={mergeBranchState?.suggestedName || ""}
         title="병합 결과를 저장할 브랜치 이름"
-        submitLabel="병합 작업장 만들기"
+        submitLabel="병합 워크스페이스 만들기"
       />
 
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
@@ -762,8 +760,8 @@ export default function DocumentWorkspacePage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteDialog?.type === "commit"
-                ? "현재 보고 있는 기록만 삭제됩니다. 이전 기록과 작업장은 그대로 유지됩니다."
-                : "브랜치와 그 아래 기록들이 함께 제거됩니다. 작업장은 별도 삭제 없이 브랜치 정리 흐름에 포함됩니다."}
+                ? "현재 보고 있는 기록만 삭제됩니다."
+                : "브랜치와 그 아래 기록들이 함께 제거됩니다."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

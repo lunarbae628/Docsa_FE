@@ -1,18 +1,4 @@
-import { useNavigate } from "react-router"
-import Loading from "./Loading"
-
-// Custom Hooks
-import { useDocuments } from "@/hooks/useDocuments"
-import { useCreateDocument } from "@/hooks/useCreateDocument"
-import { useEditDocument } from "@/hooks/useEditDocument"
-import { useDeleteDocument } from "@/hooks/useDeleteDocument"
-
-// Components
-import SearchAndCreateBar from "./documents/SearchAndCreateBar"
-import DocumentsGrid from "./documents/DocumentsGrid"
-import CreateDocumentModal from "./documents/CreateDocumentModal"
-import EditDocumentModal from "./documents/EditDocumentModal"
-import DeleteDocumentDialog from "./documents/DeleteDocumentDialog"
+import type { DocListResponse } from "@/api/__generated__/models/DocListResponse"
 import {
   Pagination,
   PaginationContent,
@@ -22,7 +8,18 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import type { DocListResponse } from "@/api/__generated__/models/DocListResponse"
+import { useCreateDocument } from "@/hooks/useCreateDocument"
+import { useDeleteDocument } from "@/hooks/useDeleteDocument"
+import { useDocuments } from "@/hooks/useDocuments"
+import { useEditDocument } from "@/hooks/useEditDocument"
+import { getDocumentWorkspacePath } from "@/lib/documentRoute"
+import { useNavigate } from "react-router"
+import Loading from "./Loading"
+import CreateDocumentModal from "./documents/CreateDocumentModal"
+import DeleteDocumentDialog from "./documents/DeleteDocumentDialog"
+import DocumentsGrid from "./documents/DocumentsGrid"
+import EditDocumentModal from "./documents/EditDocumentModal"
+import SearchAndCreateBar from "./documents/SearchAndCreateBar"
 
 export default function DocumentsList() {
   const navigate = useNavigate()
@@ -56,14 +53,7 @@ export default function DocumentsList() {
   // 문서 클릭 핸들러
   const handleDocumentClick = (doc: DocListResponse) => {
     console.log(`문서 ${doc.id} 열기`)
-    const { recentType, recentTypeId } = doc.recent || {}
-    if (recentType === "SAVE" && recentTypeId) {
-      navigate(`/documents/${doc.id}?mode=save&saveId=${recentTypeId}`)
-    } else if (recentType === "COMMIT" && recentTypeId) {
-      navigate(`/documents/${doc.id}?mode=commit&commitId=${recentTypeId}`)
-    } else {
-      navigate(`/documents/${doc.id}`)
-    }
+    navigate(getDocumentWorkspacePath(doc))
   }
 
   // 페이지네이션 범위 계산

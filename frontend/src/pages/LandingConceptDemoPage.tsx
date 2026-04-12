@@ -413,7 +413,7 @@ export default function LandingConceptDemoPage() {
           side="left"
           subtitle="MERGE — BACK TO MAIN"
           title="확인 후 병합"
-          desc="각 기록에서 필요한 부분만 선택해 새로운 작업장으로 합칩니다. 비교와 병합이 한 화면에서 이어지므로 흐름을 끊지 않고 문서를 정리할 수 있습니다."
+          desc="각 기록에서 필요한 부분만 선택해 새로운 워크스페이스로 합칩니다. 비교와 병합이 한 화면에서 이어지므로 흐름을 끊지 않고 문서를 정리할 수 있습니다."
           scrollYProgress={scrollYProgress}
         />
       </section>

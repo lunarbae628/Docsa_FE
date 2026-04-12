@@ -56,8 +56,8 @@ export function useDocumentWorkspaceReviewState({
       kind: "workspace" as const,
       id: workspace.id,
       branchId: workspace.branchId,
-      title: branch ? `${branch.name} 작업장` : "작업장",
-      subtitle: "현재 편집 상태",
+      title: branch ? `${branch.name} 워크스페이스` : "워크스페이스",
+      subtitle: "편집 상태",
       blocks: workspace.blocks,
     }
   }, [branches, commits, view, workspaces])
@@ -85,8 +85,8 @@ export function useDocumentWorkspaceReviewState({
       kind: "workspace" as const,
       id: workspace.id,
       branchId: workspace.branchId,
-      title: branch ? `${branch.name} 작업장` : "작업장",
-      subtitle: "현재 편집 상태",
+      title: branch ? `${branch.name} 워크스페이스` : "워크스페이스",
+      subtitle: "편집 상태",
       blocks: workspace.blocks,
     }
   }, [branches, commits, view, workspaces])
@@ -114,8 +114,8 @@ export function useDocumentWorkspaceReviewState({
       kind: "workspace" as const,
       id: workspace.id,
       branchId: workspace.branchId,
-      title: branch ? `${branch.name} 작업장` : "작업장",
-      subtitle: "현재 편집 상태",
+      title: branch ? `${branch.name} 워크스페이스` : "워크스페이스",
+      subtitle: "편집 상태",
       blocks: workspace.blocks,
     }
   }, [branches, commits, view, workspaces])
@@ -143,8 +143,8 @@ export function useDocumentWorkspaceReviewState({
       kind: "workspace" as const,
       id: workspace.id,
       branchId: workspace.branchId,
-      title: branch ? `${branch.name} 작업장` : "작업장",
-      subtitle: "현재 편집 상태",
+      title: branch ? `${branch.name} 워크스페이스` : "워크스페이스",
+      subtitle: "편집 상태",
       blocks: workspace.blocks,
     }
   }, [branches, commits, view, workspaces])

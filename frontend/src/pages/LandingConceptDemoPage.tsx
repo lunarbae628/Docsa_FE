@@ -303,7 +303,7 @@ export default function LandingConceptDemoPage() {
               <CheckCircle2 size={24} className="text-[#050505]" />
             </div>
             <div className="text-orange-400 font-mono font-bold tracking-widest text-sm bg-orange-500/10 px-6 py-2 rounded-full border border-orange-500/30">
-              Docsa (V_1.0)
+              Docsa v1.0
             </div>
           </motion.div>
         </div>
@@ -326,8 +326,8 @@ export default function LandingConceptDemoPage() {
             </span>
           </h1>
           <p className="mx-auto mb-16 max-w-3xl text-xl font-light leading-relaxed text-gray-400 md:text-2xl">
-            더 이상 파일 이름 뒤에 '진짜최종'을 붙이며 고통받지 마세요. <br />
-            Docsa의 유기적인 시각화 엔진이 문서의 모든 흐름을 통제합니다.
+            더 이상 파일 이름 뒤에 '진짜최종'을 붙이지 마세요. <br />
+            Docsa는 초안, 기록, 분기, 병합까지 문서의 흐름을 한눈에 정리합니다.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <button
@@ -369,7 +369,7 @@ export default function LandingConceptDemoPage() {
           side="left"
           subtitle="WRITE — WORKSPACE"
           title="문서 작성"
-          desc="워크스테이션에서 블록 기반의 편리한 문서작성이 가능합니다. 자동저장 기능으로 미저장의 공포에서 벗어나세요. "
+          desc="워크스테이션에서 블록 기반의 편리한 문서작성이 가능합니다. 자동저장 기능으로 작업물이 날아가지 않습니다 :)"
           scrollYProgress={scrollYProgress}
         />
 
@@ -380,7 +380,7 @@ export default function LandingConceptDemoPage() {
           side="left"
           subtitle="COMMIT — SNAPSHOT"
           title="기록 남기기"
-          desc="의미 있는 시점마다 기록을 남깁니다. 어떤 상태가 언제 만들어졌는지 흐름으로 축적되기 때문에 작업 과정과 결과를 함께 관리할 수 있습니다."
+          desc="의미 있는 시점마다 문서 상태를 기록으로 남깁니다. 어떤 내용이 언제 만들어졌는지 흐름으로 남아 작업 과정과 결과를 함께 관리할 수 있습니다."
           scrollYProgress={scrollYProgress}
         />
 
@@ -402,7 +402,7 @@ export default function LandingConceptDemoPage() {
           side="right"
           subtitle="COMPARE — REVIEW"
           title="비교와 검토"
-          desc="과거 작업물들을 문자기준으로 비교하여 차이점을 파악할 수 있습니다. 어떤 문장과 단어가 바뀌었는지 빠르게 확인하세요."
+          desc="서로 다른 기록을 텍스트 기준으로 비교해 차이를 확인합니다. 어떤 문장과 단어가 바뀌었는지 빠르게 파악할 수 있습니다."
           scrollYProgress={scrollYProgress}
         />
 
@@ -413,7 +413,7 @@ export default function LandingConceptDemoPage() {
           side="left"
           subtitle="MERGE — BACK TO MAIN"
           title="확인 후 병합"
-          desc="각 기록에서 마음에 드는 부분들만 합쳐 새로운 글을 작성합니다. 한페이지에서 비교와 병합이 이루어집니다. 더 이상 화면을 왔다갔다 할 필요가 없습니다."
+          desc="각 기록에서 필요한 부분만 선택해 새로운 작업장으로 합칩니다. 비교와 병합이 한 화면에서 이어지므로 흐름을 끊지 않고 문서를 정리할 수 있습니다."
           scrollYProgress={scrollYProgress}
         />
       </section>

@@ -1,10 +1,13 @@
-import { useState, useRef, useCallback, useEffect, type ReactNode } from "react"
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 
 interface ResizableLayoutProps {
   children: [ReactNode, ReactNode] // [sidebar content, main content]
   initialWidth?: number
   minWidth?: number
   maxWidth?: number
+  isSidebarCollapsed?: boolean
+  collapsedWidth?: number
+  collapsedSidebar?: ReactNode
   onWidthChange?: (width: number) => void
   className?: string
   sidebarClassName?: string
@@ -17,6 +20,9 @@ export default function ResizableLayout({
   initialWidth = 300,
   minWidth = 200,
   maxWidth = 600,
+  isSidebarCollapsed = false,
+  collapsedWidth = 56,
+  collapsedSidebar,
   onWidthChange,
   className = "",
   sidebarClassName = "",
@@ -37,7 +43,7 @@ export default function ResizableLayout({
 
   const resize = useCallback(
     (mouseMoveEvent: MouseEvent) => {
-      if (isResizing) {
+      if (isResizing && !isSidebarCollapsed) {
         const newWidth = mouseMoveEvent.clientX
         if (newWidth >= minWidth && newWidth <= maxWidth) {
           setSidebarWidth(newWidth)
@@ -45,7 +51,7 @@ export default function ResizableLayout({
         }
       }
     },
-    [isResizing, minWidth, maxWidth, onWidthChange],
+    [isResizing, isSidebarCollapsed, minWidth, maxWidth, onWidthChange],
   )
 
   useEffect(() => {
@@ -77,19 +83,25 @@ export default function ResizableLayout({
       <div
         ref={sidebarRef}
         className={`bg-white border-r border-gray-200 flex-shrink-0 relative ${sidebarClassName}`}
-        style={{ width: `${sidebarWidth}px` }}
+        style={{
+          width: `${isSidebarCollapsed ? collapsedWidth : sidebarWidth}px`,
+        }}
       >
-        <div className="h-full overflow-auto">{sidebarContent}</div>
+        <div className="h-full overflow-auto">
+          {isSidebarCollapsed ? collapsedSidebar : sidebarContent}
+        </div>
 
         {/* 리사이즈 핸들 */}
-        <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-blue-500 transition-colors duration-200 ${resizerClassName}`}
-          onMouseDown={startResizing}
-        >
-          <div className="w-full h-full flex items-center justify-center">
-            <div className="w-0.5 h-8 bg-gray-300 hover:bg-blue-500 transition-colors duration-200"></div>
+        {!isSidebarCollapsed ? (
+          <div
+            className={`absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-blue-500 transition-colors duration-200 ${resizerClassName}`}
+            onMouseDown={startResizing}
+          >
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="w-0.5 h-8 bg-gray-300 hover:bg-blue-500 transition-colors duration-200"></div>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
 
       {/* 메인 컨텐츠 영역 */}

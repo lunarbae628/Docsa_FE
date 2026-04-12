@@ -33,6 +33,8 @@ import {
   GitCompareArrows,
   GitMerge,
   Loader2,
+  PanelLeftClose,
+  PanelLeftOpen,
   Play,
   Trash2,
   X,
@@ -132,6 +134,7 @@ function WorkspaceAutosaveStatus({
 export default function DocumentWorkspacePage() {
   const { id: documentIdParam } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [isGraphCollapsed, setIsGraphCollapsed] = useState(false)
   const queryDocumentId = Number(documentIdParam || 0)
   const isRealDocument = Number.isFinite(queryDocumentId) && queryDocumentId > 0
   const documentId = isRealDocument ? queryDocumentId : 0
@@ -146,8 +149,13 @@ export default function DocumentWorkspacePage() {
       ? requestedMode
       : null
 
-  const { graphQuery, graphData, updateGraphData, mainBranch, isInitialLoading } =
-    useDocumentWorkspaceGraphState(documentId)
+  const {
+    graphQuery,
+    graphData,
+    updateGraphData,
+    mainBranch,
+    isInitialLoading,
+  } = useDocumentWorkspaceGraphState(documentId)
 
   const directSelectedContent = useDocumentContent({
     documentMode: (requestedDocumentMode ?? "save") as "save" | "commit",
@@ -213,10 +221,10 @@ export default function DocumentWorkspacePage() {
     workspaces,
   })
 
-  const derivedMainWorkspace =
-    mainBranch && mainBranch.id
-      ? workspaces.find((workspace) => workspace.branchId === mainBranch.id) ?? null
-      : null
+  const derivedMainWorkspace = mainBranch?.id
+    ? (workspaces.find((workspace) => workspace.branchId === mainBranch.id) ??
+      null)
+    : null
 
   const {
     syncStatus,
@@ -317,9 +325,11 @@ export default function DocumentWorkspacePage() {
   )
   const showReviewContentPending = useDelayedFlag(
     view.mode === "compare"
-      ? !compareBaseReady || Boolean(compareBaseItem && view.compareId && !compareTargetReady)
+      ? !compareBaseReady ||
+          Boolean(compareBaseItem && view.compareId && !compareTargetReady)
       : view.mode === "merge"
-        ? !mergeBaseReady || Boolean(mergeSourceItem && view.targetId && !mergeTargetReady)
+        ? !mergeBaseReady ||
+          Boolean(mergeSourceItem && view.targetId && !mergeTargetReady)
         : false,
   )
 
@@ -344,7 +354,10 @@ export default function DocumentWorkspacePage() {
     )
   }
 
-  if (!hasBootstrapped && (graphQuery.isLoading || isHydrating || !graphQuery.data)) {
+  if (
+    !hasBootstrapped &&
+    (graphQuery.isLoading || isHydrating || !graphQuery.data)
+  ) {
     return (
       <div className="flex h-full min-h-0 w-full items-center justify-center bg-slate-100 text-sm text-slate-500">
         문서 흐름을 불러오는 중입니다...
@@ -367,63 +380,93 @@ export default function DocumentWorkspacePage() {
           initialWidth={450}
           minWidth={340}
           maxWidth={860}
+          isSidebarCollapsed={isGraphCollapsed}
+          collapsedWidth={58}
+          collapsedSidebar={
+            <div className="flex h-full min-h-0 items-start justify-center bg-slate-100 p-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-2xl border-slate-200 bg-white shadow-sm"
+                title="그래프 열기"
+                onClick={() => setIsGraphCollapsed(false)}
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
+            </div>
+          }
           className="h-full min-h-0"
           sidebarClassName="h-full min-h-0"
           mainClassName="h-full min-h-0 bg-slate-100"
         >
-          <DocumentWorkspaceGraphPanel
-            graphData={graphData}
-            mainBranch={graphMainBranch}
-            isInitialLoading={isInitialLoading}
-            hasError={Boolean(graphQuery.error)}
-            currentBranchId={view.branchId}
-            currentCommitId={
-              view.mode === "commit"
-                ? String(view.commitId)
-                : view.mode === "compare" && view.baseKind === "commit"
-                  ? String(view.baseId)
-                  : view.mode === "merge" && view.sourceKind === "commit"
+          <div className="relative h-full min-h-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="absolute right-6 top-6 z-30 h-9 w-9 rounded-2xl border-slate-200 bg-white/95 shadow-sm backdrop-blur"
+              title="그래프 접기"
+              onClick={() => setIsGraphCollapsed(true)}
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
+            <DocumentWorkspaceGraphPanel
+              graphData={graphData}
+              mainBranch={graphMainBranch}
+              isInitialLoading={isInitialLoading}
+              hasError={Boolean(graphQuery.error)}
+              currentBranchId={view.branchId}
+              currentCommitId={
+                view.mode === "commit"
+                  ? String(view.commitId)
+                  : view.mode === "compare" && view.baseKind === "commit"
+                    ? String(view.baseId)
+                    : view.mode === "merge" && view.sourceKind === "commit"
+                      ? String(view.sourceId)
+                      : null
+              }
+              currentSaveId={
+                view.mode === "workspace"
+                  ? String(view.workspaceId)
+                  : view.mode === "merge" && view.sourceKind === "workspace"
                     ? String(view.sourceId)
                     : null
-            }
-            currentSaveId={
-              view.mode === "workspace"
-                ? String(view.workspaceId)
-                : view.mode === "merge" && view.sourceKind === "workspace"
-                  ? String(view.sourceId)
+              }
+              onNodeMenuClick={handleGraphNodeMenuClick}
+              onBranchSelect={(branchId) => {
+                openWorkspaceByBranch(branchId)
+              }}
+              onBranchDelete={(branchId) =>
+                setDeleteDialog({ type: "branch", branchId })
+              }
+              onBranchRename={handleBranchRename}
+              compareSelection={
+                view.mode === "compare"
+                  ? {
+                      active: true,
+                      baseKind: view.baseKind,
+                      baseId: view.baseId,
+                      targetKind: view.compareKind,
+                      targetId: view.compareId,
+                    }
                   : null
-            }
-            onNodeMenuClick={handleGraphNodeMenuClick}
-            onBranchSelect={(branchId) => {
-              openWorkspaceByBranch(branchId)
-            }}
-            onBranchDelete={(branchId) => setDeleteDialog({ type: "branch", branchId })}
-            onBranchRename={handleBranchRename}
-            compareSelection={
-              view.mode === "compare"
-                ? {
-                    active: true,
-                    baseKind: view.baseKind,
-                    baseId: view.baseId,
-                    targetKind: view.compareKind,
-                    targetId: view.compareId,
-                  }
-                : null
-            }
-            mergeSelection={
-              view.mode === "merge"
-                ? {
-                    active: true,
-                    sourceKind: view.sourceKind,
-                    sourceId: view.sourceId,
-                    targetKind: view.targetKind,
-                    targetId: view.targetId,
-                  }
-                : null
-            }
-            onCompareTargetPick={handleCompareTargetPick}
-            onMergeTargetPick={handleMergeTargetPick}
-          />
+              }
+              mergeSelection={
+                view.mode === "merge"
+                  ? {
+                      active: true,
+                      sourceKind: view.sourceKind,
+                      sourceId: view.sourceId,
+                      targetKind: view.targetKind,
+                      targetId: view.targetId,
+                    }
+                  : null
+              }
+              onCompareTargetPick={handleCompareTargetPick}
+              onMergeTargetPick={handleMergeTargetPick}
+            />
+          </div>
 
           <div className="h-full min-h-0 bg-slate-100 p-3">
             <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -464,7 +507,11 @@ export default function DocumentWorkspacePage() {
                         size="sm"
                         onClick={() =>
                           currentWorkspace &&
-                          handleCompareStart("workspace", currentWorkspace.id, view.branchId)
+                          handleCompareStart(
+                            "workspace",
+                            currentWorkspace.id,
+                            view.branchId,
+                          )
                         }
                       >
                         <GitCompareArrows className="h-4 w-4" /> 비교하기
@@ -483,7 +530,11 @@ export default function DocumentWorkspacePage() {
                       <Button
                         size="sm"
                         onClick={() =>
-                          handleMergeStart("commit", currentCommit.id, currentCommit.branchId)
+                          handleMergeStart(
+                            "commit",
+                            currentCommit.id,
+                            currentCommit.branchId,
+                          )
                         }
                       >
                         <GitMerge className="h-4 w-4" /> 병합하기
@@ -492,7 +543,11 @@ export default function DocumentWorkspacePage() {
                         variant="outline"
                         size="sm"
                         onClick={() =>
-                          handleCompareStart("commit", currentCommit.id, currentCommit.branchId)
+                          handleCompareStart(
+                            "commit",
+                            currentCommit.id,
+                            currentCommit.branchId,
+                          )
                         }
                       >
                         <GitCompareArrows className="h-4 w-4" /> 비교하기
@@ -500,7 +555,9 @@ export default function DocumentWorkspacePage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleContinueEditClick(currentCommit.id)}
+                        onClick={() =>
+                          handleContinueEditClick(currentCommit.id)
+                        }
                       >
                         <Play className="h-4 w-4" /> 이어서 작업하기
                       </Button>
@@ -526,7 +583,10 @@ export default function DocumentWorkspacePage() {
                       size="sm"
                       onClick={() =>
                         compareBaseItem.kind === "commit"
-                          ? openCommit(compareBaseItem.branchId, compareBaseItem.id)
+                          ? openCommit(
+                              compareBaseItem.branchId,
+                              compareBaseItem.id,
+                            )
                           : openWorkspaceByBranch(compareBaseItem.branchId)
                       }
                     >
@@ -539,7 +599,10 @@ export default function DocumentWorkspacePage() {
                       size="sm"
                       onClick={() =>
                         mergeSourceItem.kind === "commit"
-                          ? openCommit(mergeSourceItem.branchId, mergeSourceItem.id)
+                          ? openCommit(
+                              mergeSourceItem.branchId,
+                              mergeSourceItem.id,
+                            )
                           : openWorkspaceByBranch(mergeSourceItem.branchId)
                       }
                     >
@@ -554,7 +617,9 @@ export default function DocumentWorkspacePage() {
 
               <div
                 className={`flex-1 overflow-auto ${
-                  view.mode === "compare" ? "bg-slate-50 p-4" : "bg-white px-5 py-4"
+                  view.mode === "compare"
+                    ? "bg-slate-50 p-4"
+                    : "bg-white px-5 py-4"
                 }`}
               >
                 {view.mode === "workspace" ? (
@@ -617,7 +682,10 @@ export default function DocumentWorkspacePage() {
                         className="h-full"
                         onCancel={() =>
                           mergeSourceItem?.kind === "commit"
-                            ? openCommit(mergeSourceItem.branchId, mergeSourceItem.id)
+                            ? openCommit(
+                                mergeSourceItem.branchId,
+                                mergeSourceItem.id,
+                              )
                             : openWorkspaceByBranch(mergeSourceItem.branchId)
                         }
                         onSave={handleDirectMerge}
@@ -638,7 +706,9 @@ export default function DocumentWorkspacePage() {
                           <DocumentEditor
                             key={`merge-source-${mergeSourceItem?.id ?? "empty"}`}
                             isEditable={false}
-                            initialData={mergeSourceData ?? createOutputData([])}
+                            initialData={
+                              mergeSourceData ?? createOutputData([])
+                            }
                             minimalChrome={true}
                             contentLayout="document"
                           />
@@ -656,7 +726,11 @@ export default function DocumentWorkspacePage() {
                   ) : (
                     <div className="h-full min-h-[760px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                       <DocumentPendingCanvas
-                        label={view.targetId ? "병합 대상 준비 중" : "병합 기준 준비 중"}
+                        label={
+                          view.targetId
+                            ? "병합 대상 준비 중"
+                            : "병합 기준 준비 중"
+                        }
                         visible={showReviewContentPending}
                         compact
                       />
@@ -752,11 +826,16 @@ export default function DocumentWorkspacePage() {
         submitLabel="병합 워크스페이스 만들기"
       />
 
-      <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+      <AlertDialog
+        open={!!deleteDialog}
+        onOpenChange={(open) => !open && setDeleteDialog(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {deleteDialog?.type === "commit" ? "기록을 삭제할까요?" : "브랜치를 삭제할까요?"}
+              {deleteDialog?.type === "commit"
+                ? "기록을 삭제할까요?"
+                : "브랜치를 삭제할까요?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteDialog?.type === "commit"

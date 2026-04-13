@@ -95,11 +95,11 @@ const quoteRenderer: BlockRenderer<BlockData> = {
 
 function renderQuote(data: BlockData, content: ReactNode) {
   return (
-    <blockquote className="cdx-block cdx-quote my-1 border-l-[3px] border-slate-300 py-1 pl-4 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-600">
+    <blockquote className="cdx-block cdx-quote my-2 border-l-[3px] border-slate-300 py-1 pl-4 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-600">
       <div className="cdx-quote__text">{content}</div>
       {data.caption ? (
         <footer className="cdx-quote__caption mt-1 text-[0.9em] leading-6 text-slate-400">
-          {String(data.caption)}
+          {normalizeVisibleText(data.caption)}
         </footer>
       ) : null}
     </blockquote>
@@ -129,9 +129,11 @@ const codeRenderer: BlockRenderer<BlockData> = {
 
 function renderCode(content: ReactNode) {
   return (
-    <pre className="ce-code cdx-block my-2 overflow-auto rounded-[14px] border border-slate-200 bg-slate-50 px-[18px] py-4 font-mono text-[0.92rem] leading-7 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-      <code>{content}</code>
-    </pre>
+    <div className="ce-code cdx-block my-[0.65em]">
+      <pre className="ce-code__textarea m-0 min-h-[120px] w-full overflow-auto rounded-[14px] border border-slate-200 bg-slate-50 px-[18px] py-4 font-mono text-[0.92rem] leading-[1.7] text-slate-700 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.75)]">
+        <code>{content}</code>
+      </pre>
+    </div>
   )
 }
 
@@ -177,35 +179,52 @@ const listRenderer: BlockRenderer<BlockData> = {
       side: context.side,
     })
 
-    return (
-      <div className="cdx-block space-y-1.5 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700">
-        {lines.map((line, index) => {
-          const parsedLine = parseDiffListLine(line, style, index)
+    if (style === "checklist") {
+      return (
+        <div className="cdx-block space-y-1.5 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700">
+          {lines.map((line, index) => {
+            const parsedLine = parseDiffListLine(line, style, index)
 
-          return (
-            <div
-              key={`${lineText(line)}-${index}`}
-              className="grid grid-cols-[1.2rem_minmax(0,1fr)] items-start gap-1.5"
-            >
-              <span className="mt-[0.08em] flex min-h-5 items-start justify-end pr-1 text-[0.95em] font-normal text-slate-500">
-                {parsedLine.marker === "checkbox" ? (
-                  <ChecklistMarker checked={parsedLine.checked} />
-                ) : (
-                  parsedLine.marker
-                )}
-              </span>
-              <span className="min-w-0 break-words">
-                {renderDiffTokens({
-                  tokens: parsedLine.tokens,
-                  side: context.side,
-                  isRegionSelected: context.isRegionSelected,
-                  onSelectRegion: context.onSelectRegion,
-                })}
-              </span>
-            </div>
-          )
-        })}
-      </div>
+            return (
+              <div
+                key={`${lineText(line)}-${index}`}
+                className="flex items-start gap-2.5"
+              >
+                <ChecklistMarker checked={parsedLine.checked} />
+                <span className="min-w-0 break-words pt-px">
+                  {renderDiffTokens({
+                    tokens: parsedLine.tokens,
+                    side: context.side,
+                    isRegionSelected: context.isRegionSelected,
+                    onSelectRegion: context.onSelectRegion,
+                  })}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+
+    return renderListShell(
+      lines.map((line, index) => {
+        const parsedLine = parseDiffListLine(line, style, index)
+
+        return (
+          <li
+            key={`${lineText(line)}-${index}`}
+            className="cdx-list__item py-[0.08em] pl-[0.1em]"
+          >
+            {renderDiffTokens({
+              tokens: parsedLine.tokens,
+              side: context.side,
+              isRegionSelected: context.isRegionSelected,
+              onSelectRegion: context.onSelectRegion,
+            })}
+          </li>
+        )
+      }),
+      style === "ordered",
     )
   },
 }
@@ -215,7 +234,7 @@ function ChecklistMarker({ checked }: { checked: boolean }) {
     <span
       aria-hidden="true"
       className={cn(
-        "mt-[0.35em] flex h-4 w-4 items-center justify-center rounded-[4px] border text-[10px] font-semibold leading-none",
+        "mt-[0.42em] flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px] font-semibold leading-none",
         checked
           ? "border-slate-500 bg-slate-600 text-white"
           : "border-slate-300 bg-white text-transparent",
@@ -264,29 +283,41 @@ function renderChecklist(items: unknown[]): ReactNode {
 }
 
 function renderList(items: unknown[], ordered: boolean): ReactNode {
-  return (
-    <div className="cdx-block space-y-1.5 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700">
-      {items.map((item, index) => {
-        const children = getListItemChildren(item)
-        const marker = ordered ? `${index + 1}.` : "•"
+  return renderListShell(
+    items.map((item, index) => {
+      const children = getListItemChildren(item)
 
-        return (
-          <div
-            key={`${getListItemText(item)}-${index}`}
-            className="grid grid-cols-[1.2rem_minmax(0,1fr)] items-start gap-1.5"
-          >
-            <span className="mt-[0.08em] flex min-h-5 items-start justify-end pr-1 text-[0.95em] font-normal text-slate-500">
-              {marker}
-            </span>
-            <div className="min-w-0 break-words">
-              <span>{getListItemText(item)}</span>
-              {children.length ? (
-                <div className="mt-1">{renderList(children, ordered)}</div>
-              ) : null}
-            </div>
-          </div>
-        )
-      })}
+      return (
+        <li
+          key={`${getListItemText(item)}-${index}`}
+          className="cdx-list__item py-[0.08em] pl-[0.1em]"
+        >
+          <span>{getListItemText(item)}</span>
+          {children.length ? (
+            <div className="mt-1">{renderList(children, ordered)}</div>
+          ) : null}
+        </li>
+      )
+    }),
+    ordered,
+  )
+}
+
+function renderListShell(items: ReactNode, ordered: boolean): ReactNode {
+  const ListTag = ordered ? "ol" : "ul"
+
+  return (
+    <div className="cdx-block">
+      <ListTag
+        className={cn(
+          "cdx-list m-0 pl-[1.35em] text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700",
+          ordered
+            ? "cdx-list--ordered list-decimal"
+            : "cdx-list--unordered list-disc",
+        )}
+      >
+        {items}
+      </ListTag>
     </div>
   )
 }
@@ -297,7 +328,7 @@ const delimiterRenderer: BlockRenderer<BlockData> = {
   },
   render() {
     return (
-      <div className="cdx-block flex w-full items-center py-5">
+      <div className="ce-delimiter cdx-block flex w-full items-center justify-center py-[1.35em] leading-none">
         <div className="h-px w-full rounded-full bg-slate-200" />
       </div>
     )

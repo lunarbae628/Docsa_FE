@@ -275,6 +275,121 @@ function isEditableTextBlock(block?: EditorBlock) {
   )
 }
 
+function getListStyle(
+  block: EditorBlock,
+): "ordered" | "unordered" | "checklist" {
+  return block.data.style === "ordered" ||
+    block.data.style === "unordered" ||
+    block.data.style === "checklist"
+    ? block.data.style
+    : "unordered"
+}
+
+function normalizeListText(value: unknown) {
+  return String(value ?? "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .trim()
+}
+
+function parseListLine(
+  line: string,
+  style: "ordered" | "unordered" | "checklist",
+) {
+  const trimmedLine = normalizeListText(line)
+
+  if (style === "checklist") {
+    const checklistMatch = trimmedLine.match(
+      /^(?:[-*•]|\d+\.)?\s*\[(x|X|\s)?]\s*(.*)$/,
+    )
+
+    return {
+      content: normalizeListText(
+        checklistMatch ? checklistMatch[2] : trimmedLine,
+      ),
+      checked: checklistMatch
+        ? (checklistMatch[1] ?? "").toLowerCase() === "x"
+        : false,
+    }
+  }
+
+  return {
+    content: normalizeListText(trimmedLine.replace(/^(\d+\.|[-*•])\s+/, "")),
+    checked: false,
+  }
+}
+
+function setListItemContent(
+  item: unknown,
+  content: string,
+  checked: boolean,
+  style: "ordered" | "unordered" | "checklist",
+) {
+  if (typeof item === "string") {
+    return content
+  }
+
+  if (!item || typeof item !== "object") {
+    if (style === "checklist") {
+      return { content, meta: { checked }, items: [] }
+    }
+
+    return { content, meta: {}, items: [] }
+  }
+
+  const nextItem = { ...(item as Record<string, unknown>) }
+
+  nextItem.content = content
+  nextItem.text = undefined
+  nextItem.value = undefined
+  nextItem.checked = undefined
+
+  if (style === "checklist") {
+    const meta =
+      nextItem.meta && typeof nextItem.meta === "object" ? nextItem.meta : {}
+    nextItem.meta = { ...(meta as Record<string, unknown>), checked }
+  }
+
+  if (!Array.isArray(nextItem.items)) {
+    nextItem.items = []
+  }
+
+  return nextItem
+}
+
+function setListBlockText(block: EditorBlock, text: string): EditorBlock {
+  const nextBlock = cloneData(block)
+  const style = getListStyle(nextBlock)
+  const originalItems = Array.isArray(nextBlock.data.items)
+    ? nextBlock.data.items
+    : []
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  nextBlock.data.style = style
+  nextBlock.data.items = lines
+    .map((line) => parseListLine(line, style))
+    .filter((line) => line.content.length > 0)
+    .map((line, index) =>
+      setListItemContent(
+        originalItems[index],
+        line.content,
+        line.checked,
+        style,
+      ),
+    )
+
+  return nextBlock
+}
+
 function setBlockText(block: EditorBlock, text: string): EditorBlock {
   const nextBlock = cloneData(block)
 
@@ -287,18 +402,8 @@ function setBlockText(block: EditorBlock, text: string): EditorBlock {
     case "code":
       nextBlock.data.code = text
       return nextBlock
-    case "list": {
-      const lines = text
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-      const ordered = lines.every((line) => /^\d+\.\s+/.test(line))
-      nextBlock.data.style = ordered ? "ordered" : "unordered"
-      nextBlock.data.items = lines.map((line) =>
-        line.replace(/^(\d+\.|[-*•])\s+/, ""),
-      )
-      return nextBlock
-    }
+    case "list":
+      return setListBlockText(block, text)
     default:
       return nextBlock
   }

@@ -1,19 +1,22 @@
 import {
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-  forwardRef,
-  useImperativeHandle,
-} from "react"
+  editorDataToMarkdown,
+  markdownToEditorData,
+} from "@/lib/editorMarkdown"
+import Code from "@editorjs/code"
+import Delimiter from "@editorjs/delimiter"
 import EditorJS, { type OutputData } from "@editorjs/editorjs"
 import Header from "@editorjs/header"
 import List from "@editorjs/list"
-import Quote from "@editorjs/quote"
-import Code from "@editorjs/code"
-import Delimiter from "@editorjs/delimiter"
 import Paragraph from "@editorjs/paragraph"
-import { editorDataToMarkdown, markdownToEditorData } from "@/lib/editorMarkdown"
+import Quote from "@editorjs/quote"
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react"
 
 interface DocumentEditorProps {
   isEditable: boolean
@@ -106,7 +109,8 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             return [block]
           }
 
-          const transformedBlocks = markdownToEditorData(paragraphMarkdown).blocks
+          const transformedBlocks =
+            markdownToEditorData(paragraphMarkdown).blocks
 
           if (
             normalizeBlocksForCompare(paragraphData) ===
@@ -365,9 +369,13 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
         <div
           ref={containerRef}
           className={`document-editor-shell h-full min-h-full ${
-            contentLayout === "document" ? "document-editor-shell--document" : ""
+            contentLayout === "document"
+              ? "document-editor-shell--document"
+              : ""
           } ${
-            minimalChrome ? "border-0 rounded-none p-0" : "border rounded-lg p-4"
+            minimalChrome
+              ? "border-0 rounded-none p-0"
+              : "border rounded-lg p-4"
           }`}
           style={{
             fontSize: "16px",
@@ -395,6 +403,124 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             max-width: 860px !important;
             margin-left: auto !important;
             margin-right: auto !important;
+          }
+
+          .document-editor-shell .codex-editor {
+            color: #1f2937;
+          }
+
+          .document-editor-shell .ce-block {
+            padding: 1px 0;
+          }
+
+          .document-editor-shell .ce-paragraph,
+          .document-editor-shell .cdx-list,
+          .document-editor-shell .cdx-quote,
+          .document-editor-shell .ce-code {
+            font-size: 16px;
+            line-height: 1.78;
+            letter-spacing: -0.01em;
+          }
+
+          .document-editor-shell .ce-paragraph {
+            padding: 0.18em 0;
+          }
+
+          .document-editor-shell .ce-paragraph[data-placeholder]:empty::before {
+            color: #9ca3af;
+            opacity: 1;
+          }
+
+          .document-editor-shell .ce-header {
+            color: #111827 !important;
+            letter-spacing: -0.035em;
+            line-height: 1.28 !important;
+            padding: 0.32em 0 0.16em !important;
+          }
+
+          .document-editor-shell h1.ce-header {
+            font-size: 2.25rem !important;
+          }
+
+          .document-editor-shell h2.ce-header {
+            font-size: 1.75rem !important;
+          }
+
+          .document-editor-shell h3.ce-header {
+            font-size: 1.38rem !important;
+          }
+
+          .document-editor-shell h4.ce-header {
+            font-size: 1.12rem !important;
+          }
+
+          .document-editor-shell h5.ce-header,
+          .document-editor-shell h6.ce-header {
+            font-size: 1rem !important;
+          }
+
+          .document-editor-shell .cdx-list {
+            padding-left: 1.35em;
+          }
+
+          .document-editor-shell .cdx-list__item {
+            padding: 0.08em 0 0.08em 0.1em;
+          }
+
+          .document-editor-shell .cdx-quote {
+            margin: 0.5em 0;
+            padding: 0.15em 0 0.15em 0.95em;
+            border-left: 3px solid #d1d5db;
+            color: #4b5563;
+          }
+
+          .document-editor-shell .cdx-quote__text {
+            min-height: 0;
+          }
+
+          .document-editor-shell .cdx-quote__caption {
+            color: #9ca3af;
+            font-size: 0.9em;
+          }
+
+          .document-editor-shell .ce-code {
+            margin: 0.65em 0;
+          }
+
+          .document-editor-shell .ce-code__textarea {
+            min-height: 120px;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            background: #f8fafc;
+            color: #334155;
+            font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+            font-size: 0.92rem;
+            line-height: 1.7;
+            padding: 16px 18px;
+            box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.75);
+          }
+
+          .document-editor-shell .ce-delimiter {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 1.35em 0;
+            line-height: 0;
+            text-align: center;
+          }
+
+          .document-editor-shell .ce-delimiter::before {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: 1px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            content: "" !important;
+            font-size: 0;
+            line-height: 0;
+            letter-spacing: 0;
           }
         `}</style>
         {!isReady && (

@@ -118,11 +118,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-.ce-block__content {
-  margin: 0 60px;
-}
-
-.ce-toolbar__content {
-  margin: 0 60px;
-}

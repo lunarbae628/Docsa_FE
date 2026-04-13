@@ -5,6 +5,10 @@ import { diff_match_patch } from "diff-match-patch"
 import { Check, ChevronsLeft, ChevronsRight, GitMerge, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import DocumentEditor, { type DocumentEditorRef } from "./DocumentEditor"
+import EditorBlockPreview, {
+  getVisibleBlockText,
+  type PreviewDiffSegment,
+} from "./EditorBlockPreview"
 import { Button } from "./ui/button"
 
 interface DocumentMergeViewProps {
@@ -60,48 +64,6 @@ function createOutputData(blocks: OutputData["blocks"]): OutputData {
     time: Date.now(),
     version: "2.30.8",
     blocks,
-  }
-}
-
-function getVisibleBlockText(block: EditorBlock | undefined): string {
-  if (!block?.data) return ""
-
-  switch (block.type) {
-    case "paragraph":
-    case "header":
-    case "quote":
-      return String(block.data.text ?? "").replace(/<br\s*\/?>/gi, "\n")
-    case "code":
-      return String(block.data.code ?? "")
-    case "list": {
-      const items = Array.isArray(block.data.items) ? block.data.items : []
-      const ordered = block.data.style === "ordered"
-
-      return items
-        .map((item, index) => {
-          const text =
-            typeof item === "string"
-              ? item
-              : String(item?.content ?? item?.text ?? item?.value ?? "")
-          return ordered ? `${index + 1}. ${text}` : `• ${text}`
-        })
-        .join("\n")
-    }
-    default:
-      return String(block?.data?.text ?? JSON.stringify(block.data))
-  }
-}
-
-function blockBodyClass(block: EditorBlock | undefined) {
-  switch (block?.type) {
-    case "header":
-      return "text-[1.55rem] font-semibold leading-10 text-slate-900"
-    case "quote":
-      return "border-l-4 border-slate-200 pl-4 text-[15px] italic leading-7 text-slate-600"
-    case "code":
-      return "rounded-lg bg-slate-900/95 px-4 py-3 font-mono text-[13px] leading-6 text-slate-100"
-    default:
-      return "text-[15px] leading-8 text-slate-700"
   }
 }
 
@@ -658,102 +620,29 @@ function PaneBlock({
   const wholeDecision = decisions[decisionKey(row, null)] ?? null
   const isWholeSelected = wholeDecision === side
 
-  if (row.status === "same") {
-    return (
-      <div
-        className={cn(
-          "whitespace-pre-wrap break-words font-sans",
-          blockBodyClass(block),
-        )}
-      >
-        {blockText}
-      </div>
-    )
-  }
-
-  if (!compareBlock) {
-    return (
-      <button
-        type="button"
-        onClick={() => onSelectWhole(row, side)}
-        className={cn(
-          "w-full rounded-xl px-3 py-2 text-left transition",
-          side === "left"
-            ? isWholeSelected
-              ? "bg-rose-200/90"
-              : "bg-rose-100/80 hover:bg-rose-150"
-            : isWholeSelected
-              ? "bg-emerald-200/90"
-              : "bg-emerald-100/80 hover:bg-emerald-150",
-        )}
-      >
-        <div
-          className={cn(
-            "whitespace-pre-wrap break-words font-sans",
-            blockBodyClass(block),
-          )}
-        >
-          {blockText}
-        </div>
-      </button>
-    )
-  }
-
-  const segments = buildDiffSegments(
-    side === "left" ? blockText : compareText,
-    side === "left" ? compareText : blockText,
-  )
+  const segments =
+    row.status !== "same" && compareBlock
+      ? (buildDiffSegments(
+          side === "left" ? blockText : compareText,
+          side === "left" ? compareText : blockText,
+        ) as PreviewDiffSegment[])
+      : undefined
 
   return (
-    <div
-      className={cn(
-        "whitespace-pre-wrap break-words font-sans",
-        blockBodyClass(block),
-      )}
-    >
-      {segments.map((segment, index) => {
-        if (segment.type === "equal") {
-          return <span key={`equal-${index}`}>{segment.text}</span>
-        }
-
-        const visibleText =
-          side === "left" ? segment.leftText : segment.rightText
-        if (!visibleText) {
-          return null
-        }
-
-        const selected =
-          decisions[decisionKey(row, segment.regionIndex)] === side
-
-        return (
-          <span
-            key={`changed-${segment.regionIndex}`}
-            // biome-ignore lint/a11y/useSemanticElements: This must participate in normal text wrapping with adjacent equal text.
-            role="button"
-            tabIndex={0}
-            onClick={() => onSelectRegion(row, side, segment.regionIndex)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault()
-                onSelectRegion(row, side, segment.regionIndex)
-              }
-            }}
-            className={cn(
-              "cursor-pointer underline decoration-[0.18em] underline-offset-[0.16em]",
-              side === "left"
-                ? selected
-                  ? "text-rose-900 decoration-rose-300"
-                  : "text-rose-700 decoration-rose-200 hover:decoration-rose-300"
-                : selected
-                  ? "text-emerald-900 decoration-emerald-300"
-                  : "text-emerald-700 decoration-emerald-200 hover:decoration-emerald-300",
-            )}
-          >
-            {visibleText}
-          </span>
-        )
-      })}
-    </div>
+    <EditorBlockPreview
+      block={block}
+      side={side}
+      status={row.status}
+      segments={segments}
+      isWholeSelected={isWholeSelected}
+      isRegionSelected={(regionIndex) =>
+        decisions[decisionKey(row, regionIndex)] === side
+      }
+      onSelectWhole={
+        row.status !== "same" ? () => onSelectWhole(row, side) : undefined
+      }
+      onSelectRegion={(regionIndex) => onSelectRegion(row, side, regionIndex)}
+    />
   )
 }
 
@@ -1125,11 +1014,9 @@ export default function DocumentMergeView({
                 />
               </div>
               <style>{`
-                .merge-result-editor-frame .ce-block__content,
-                .merge-result-editor-frame .ce-toolbar__content {
+                .merge-result-editor-frame .ce-block__content {
                   max-width: none !important;
-                  margin-left: 0 !important;
-                  margin-right: 0 !important;
+                  margin: 0 !important;
                 }
 
                 .merge-result-editor-frame .codex-editor,

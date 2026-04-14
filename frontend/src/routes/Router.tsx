@@ -1,11 +1,12 @@
-import { BrowserRouter, Route, Routes } from "react-router"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
-import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
 import DocumentWorkspacePage from "@/pages/DocumentWorkspacePage"
 import DocumentsPage from "@/pages/DocumentsPage"
-import LoginPage from "@/pages/LoginPage"
-import SignupPage from "@/pages/SignupPage"
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
 import LandingConceptDemoPage from "@/pages/LandingConceptDemoPage"
+import LoginPage from "@/pages/LoginPage"
+import PreviewFixturePage from "@/pages/PreviewFixturePage"
+import SignupPage from "@/pages/SignupPage"
+import { BrowserRouter, Route, Routes } from "react-router"
 import PageLayout from "../layouts/PageLayout"
 
 export const Router = () => {
@@ -13,7 +14,11 @@ export const Router = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingConceptDemoPage />} />
-        <Route path="/demo/landing-concept" element={<LandingConceptDemoPage />} />
+        <Route
+          path="/demo/landing-concept"
+          element={<LandingConceptDemoPage />}
+        />
+        <Route path="/demo/preview-fixture" element={<PreviewFixturePage />} />
         <Route element={<PageLayout />}>
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { editorDataToMarkdown } from "@/lib/editorMarkdown"
+import type { GraphDataType } from "@/types/graph"
 import type { OutputData } from "@editorjs/editorjs"
 import type { UseQueryResult } from "@tanstack/react-query"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { SetURLSearchParams } from "react-router"
-import type { GraphDataType } from "@/types/graph"
-import { editorDataToMarkdown } from "@/lib/editorMarkdown"
 
 export type SnapshotBlock = { [key: string]: any }
 
@@ -116,7 +116,9 @@ function resolveViewFromParams(
     const workspace = workspaces.find((item) => item.id === saveId)
     const branch =
       branches.find((item) => item.saveId === saveId) ??
-      (workspace ? branches.find((item) => item.id === workspace.branchId) : null) ??
+      (workspace
+        ? branches.find((item) => item.id === workspace.branchId)
+        : null) ??
       null
 
     return {
@@ -157,7 +159,7 @@ function resolveViewFromParams(
 
   const firstCommit = mainBranch
     ? commits.find((item) => item.id === mainBranch.headCommitId)
-    : commits[0] ?? null
+    : (commits[0] ?? null)
 
   if (firstCommit) {
     return {
@@ -174,7 +176,9 @@ function resolveViewFromParams(
   }
 }
 
-function resolveImmediateViewFromParams(params: URLSearchParams): ViewState | null {
+function resolveImmediateViewFromParams(
+  params: URLSearchParams,
+): ViewState | null {
   const mode = params.get("mode")
   const saveId = Number(params.get("saveId") || 0)
   const commitId = Number(params.get("commitId") || 0)
@@ -264,6 +268,10 @@ export function useDocumentWorkspaceBodyState({
   const commitsRef = useRef<CommitRecord[]>([])
   const workspacesRef = useRef<WorkspaceRecord[]>([])
   const previousDocumentIdRef = useRef<number | null>(null)
+  const appliedDirectContentRef = useRef<{
+    key: string
+    data: SnapshotBlock[]
+  } | null>(null)
 
   useEffect(() => {
     commitsRef.current = commits
@@ -306,14 +314,16 @@ export function useDocumentWorkspaceBodyState({
       setIsHydrating(true)
 
       try {
-        const nextBranches: BranchRecord[] = sourceGraphData.branches.map((branch) => ({
-          id: branch.id,
-          name: branch.name,
-          fromCommitId: branch.fromCommitId,
-          rootCommitId: branch.rootCommitId,
-          headCommitId: branch.leafCommitId ?? null,
-          saveId: branch.saveId ?? null,
-        }))
+        const nextBranches: BranchRecord[] = sourceGraphData.branches.map(
+          (branch) => ({
+            id: branch.id,
+            name: branch.name,
+            fromCommitId: branch.fromCommitId,
+            rootCommitId: branch.rootCommitId,
+            headCommitId: branch.leafCommitId ?? null,
+            saveId: branch.saveId ?? null,
+          }),
+        )
 
         const nextCommits = sourceGraphData.commits.map((commit) =>
           createCommitRecord(
@@ -392,6 +402,21 @@ export function useDocumentWorkspaceBodyState({
     if (!requestedDocumentMode) return
     if (!directSelectedData) return
 
+    const directContentKey =
+      requestedDocumentMode === "save"
+        ? `${documentId}:save:${requestedSaveId}`
+        : `${documentId}:commit:${requestedCommitId}`
+    if (
+      appliedDirectContentRef.current?.key === directContentKey &&
+      appliedDirectContentRef.current.data === directSelectedData
+    ) {
+      return
+    }
+    appliedDirectContentRef.current = {
+      key: directContentKey,
+      data: directSelectedData,
+    }
+
     if (requestedDocumentMode === "save" && requestedSaveId) {
       const nextBlocks = directSelectedData
       const nextContent = blocksToMarkdown(nextBlocks)
@@ -405,7 +430,8 @@ export function useDocumentWorkspaceBodyState({
             ...prev,
             {
               id: saveId,
-              branchId: branches.find((branch) => branch.saveId === saveId)?.id ?? 0,
+              branchId:
+                branches.find((branch) => branch.saveId === saveId)?.id ?? 0,
               content: nextContent,
               blocks: nextBlocks,
               loaded: true,
@@ -448,9 +474,11 @@ export function useDocumentWorkspaceBodyState({
             id: commitId,
             branchId:
               branches.find((branch) =>
-                [branch.headCommitId, branch.rootCommitId, branch.fromCommitId].includes(
-                  commitId,
-                ),
+                [
+                  branch.headCommitId,
+                  branch.rootCommitId,
+                  branch.fromCommitId,
+                ].includes(commitId),
               )?.id ?? 0,
             title: `기록 ${commitId}`,
             description: "",
@@ -470,9 +498,11 @@ export function useDocumentWorkspaceBodyState({
               branchId:
                 commit.branchId ||
                 branches.find((branch) =>
-                  [branch.headCommitId, branch.rootCommitId, branch.fromCommitId].includes(
-                    commitId,
-                  ),
+                  [
+                    branch.headCommitId,
+                    branch.rootCommitId,
+                    branch.fromCommitId,
+                  ].includes(commitId),
                 )?.id ||
                 0,
               content: nextContent,
@@ -485,6 +515,7 @@ export function useDocumentWorkspaceBodyState({
   }, [
     branches,
     directSelectedData,
+    documentId,
     isRealDocument,
     requestedCommitId,
     requestedDocumentMode,
@@ -502,7 +533,12 @@ export function useDocumentWorkspaceBodyState({
     if (!isRealDocument) return
     if (!branches.length) return
 
-    const nextView = resolveViewFromParams(searchParams, branches, commits, workspaces)
+    const nextView = resolveViewFromParams(
+      searchParams,
+      branches,
+      commits,
+      workspaces,
+    )
     setView((prev) => (isSameView(prev, nextView) ? prev : nextView))
   }, [branches, commits, isRealDocument, searchParams, workspaces])
 
@@ -513,6 +549,7 @@ export function useDocumentWorkspaceBodyState({
     if (previousDocumentId === null) return
 
     if (previousDocumentId !== documentId) {
+      appliedDirectContentRef.current = null
       setHasBootstrapped(false)
       setBranches([])
       setCommits([])
@@ -527,7 +564,9 @@ export function useDocumentWorkspaceBodyState({
 
   const currentWorkspace = useMemo(() => {
     if (view.mode !== "workspace") return null
-    return workspaces.find((workspace) => workspace.id === view.workspaceId) ?? null
+    return (
+      workspaces.find((workspace) => workspace.id === view.workspaceId) ?? null
+    )
   }, [view, workspaces])
 
   const currentCommit = useMemo(() => {
@@ -540,13 +579,21 @@ export function useDocumentWorkspaceBodyState({
       const branch = branches.find((item) => item.id === branchId)
       if (!branch?.saveId) return
 
-      const nextView: ViewState = { mode: "workspace", branchId, workspaceId: branch.saveId }
+      const nextView: ViewState = {
+        mode: "workspace",
+        branchId,
+        workspaceId: branch.saveId,
+      }
       if (isSameView(view, nextView)) return
-      const targetWorkspace = workspaces.find((workspace) => workspace.id === branch.saveId)
+      const targetWorkspace = workspaces.find(
+        (workspace) => workspace.id === branch.saveId,
+      )
       if (!targetWorkspace?.loaded) {
         setWorkspaces((prev) =>
           prev.map((workspace) =>
-            workspace.id === branch.saveId ? { ...workspace, loaded: false } : workspace,
+            workspace.id === branch.saveId
+              ? { ...workspace, loaded: false }
+              : workspace,
           ),
         )
       }

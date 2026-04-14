@@ -1,15 +1,6 @@
-import { useCallback, useRef, useState } from "react"
-import type { OutputData } from "@editorjs/editorjs"
-import { useQueryClient } from "@tanstack/react-query"
-import type { Dispatch, SetStateAction } from "react"
-import type { SetURLSearchParams } from "react-router"
 import { apiClient } from "@/api/apiClient"
-import { alertDialog } from "@/lib/utils"
-import { getApiErrorMessage } from "@/lib/apiError"
-import type { GraphDataType } from "@/types/graph"
 import type { CommitNodeMenuType } from "@/components/CommitNode"
 import type { TempNodeMenuType } from "@/components/TempNode"
-import { editorDataToMarkdown } from "@/lib/editorMarkdown"
 import type {
   BranchRecord,
   CommitRecord,
@@ -18,6 +9,15 @@ import type {
   ViewState,
   WorkspaceRecord,
 } from "@/hooks/useDocumentWorkspaceBodyState"
+import { getApiErrorMessage } from "@/lib/apiError"
+import { editorDataToMarkdown } from "@/lib/editorMarkdown"
+import { alertDialog } from "@/lib/utils"
+import type { GraphDataType } from "@/types/graph"
+import type { OutputData } from "@editorjs/editorjs"
+import { useQueryClient } from "@tanstack/react-query"
+import { useCallback, useRef, useState } from "react"
+import type { Dispatch, SetStateAction } from "react"
+import type { SetURLSearchParams } from "react-router"
 
 type SyncStatus = "idle" | "syncing" | "synced"
 
@@ -36,6 +36,11 @@ type MergeBranchState = {
   mergedData: OutputData
   suggestedName: string
 } | null
+
+type PendingWorkspaceSave = {
+  saveId: number
+  blocks: SnapshotBlock[]
+}
 
 function toBranchSlug(value: string) {
   return value
@@ -87,7 +92,9 @@ function updateGraphCacheAfterCommitCreate(
       : branch,
   )
 
-  const targetBranch = graphData.branches.find((branch) => branch.id === branchId)
+  const targetBranch = graphData.branches.find(
+    (branch) => branch.id === branchId,
+  )
   const previousCommitId = targetBranch?.leafCommitId ?? null
 
   const nextEdges = [...graphData.edges]
@@ -144,7 +151,9 @@ function updateGraphCacheAfterCommitDelete(
   branchId: number,
   commitId: number,
 ) {
-  const remainingCommits = graphData.commits.filter((commit) => commit.id !== commitId)
+  const remainingCommits = graphData.commits.filter(
+    (commit) => commit.id !== commitId,
+  )
   const branchCommits = remainingCommits
     .filter((commit) => commit.branchId === branchId)
     .sort((a, b) => a.id - b.id)
@@ -202,7 +211,8 @@ function updateGraphCacheAfterBranchDelete(
     branches: graphData.branches.filter((branch) => branch.id !== branchId),
     commits: graphData.commits.filter((commit) => commit.branchId !== branchId),
     edges: graphData.edges.filter(
-      (edge) => !removedCommitIds.has(edge.from) && !removedCommitIds.has(edge.to),
+      (edge) =>
+        !removedCommitIds.has(edge.from) && !removedCommitIds.has(edge.to),
     ),
   }
 }
@@ -245,7 +255,9 @@ function removeBranchRecords(
   return {
     branches: branches.filter((branch) => branch.id !== branchId),
     commits: commits.filter((commit) => commit.branchId !== branchId),
-    workspaces: workspaces.filter((workspace) => workspace.branchId !== branchId),
+    workspaces: workspaces.filter(
+      (workspace) => workspace.branchId !== branchId,
+    ),
   }
 }
 
@@ -280,7 +292,10 @@ interface UseDocumentWorkspaceActionsParams {
     branchId: number
     title: string
   } | null
-  refreshDocumentState: (params?: URLSearchParams, syncUrl?: boolean) => Promise<void>
+  refreshDocumentState: (
+    params?: URLSearchParams,
+    syncUrl?: boolean,
+  ) => Promise<void>
   openWorkspaceByBranch: (branchId: number) => void
   openCommit: (branchId: number, commitId: number) => void
 }
@@ -314,11 +329,14 @@ export function useDocumentWorkspaceActions({
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced")
   const [toast, setToast] = useState("")
   const [branchEditState, setBranchEditState] = useState<BranchEditState>(null)
-  const [mergeBranchState, setMergeBranchState] = useState<MergeBranchState>(null)
+  const [mergeBranchState, setMergeBranchState] =
+    useState<MergeBranchState>(null)
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null)
   const [isCommitModalOpen, setIsCommitModalOpen] = useState(false)
   const [isActionPending, setIsActionPending] = useState(false)
   const syncTimerRef = useRef<number | null>(null)
+  const pendingSaveRef = useRef<PendingWorkspaceSave | null>(null)
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const canDeleteCurrentCommit = Boolean(
     view.mode === "commit" &&
@@ -327,12 +345,47 @@ export function useDocumentWorkspaceActions({
       currentBranch.headCommitId === currentCommit.id,
   )
 
+  const persistWorkspaceBlocks = useCallback(
+    (saveId: number, blocks: SnapshotBlock[]) => {
+      const saveRequest = saveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          await apiClient.save.updateSave({
+            docId: documentId,
+            saveId,
+            saveUpdateRequest: {
+              content: blocks,
+            },
+          })
+          queryClient.setQueryData(
+            ["snapshotContent", documentId, "workspace", saveId],
+            blocks,
+          )
+
+          if (
+            pendingSaveRef.current?.saveId === saveId &&
+            pendingSaveRef.current.blocks === blocks
+          ) {
+            pendingSaveRef.current = null
+          }
+        })
+
+      saveQueueRef.current = saveRequest
+      return saveRequest
+    },
+    [documentId, queryClient],
+  )
+
   const handleWorkspaceChange = useCallback(
     (data: OutputData) => {
       if (!currentWorkspace || !isRealDocument) return
 
       const nextBlocks = (data.blocks ?? []) as SnapshotBlock[]
       const nextContent = editorDataToMarkdown(data)
+      pendingSaveRef.current = {
+        saveId: currentWorkspace.id,
+        blocks: nextBlocks,
+      }
 
       setWorkspaces((prev) =>
         prev.map((workspace) =>
@@ -348,31 +401,29 @@ export function useDocumentWorkspaceActions({
       }
 
       syncTimerRef.current = window.setTimeout(async () => {
+        syncTimerRef.current = null
+
         try {
-          await apiClient.save.updateSave({
-            docId: documentId,
-            saveId: currentWorkspace.id,
-            saveUpdateRequest: {
-              content: nextBlocks,
-            },
-          })
-          queryClient.setQueryData(
-            ["snapshotContent", documentId, "workspace", currentWorkspace.id],
-            nextBlocks,
-          )
-          setSyncStatus("synced")
-          setToast("자동 저장됨")
+          await persistWorkspaceBlocks(currentWorkspace.id, nextBlocks)
+
+          if (!pendingSaveRef.current) {
+            setSyncStatus("synced")
+            setToast("자동 저장됨")
+          }
         } catch (error: any) {
           setSyncStatus("idle")
           await alertDialog(
-            await getApiErrorMessage(error, "워크스페이스 자동 저장에 실패했습니다."),
+            await getApiErrorMessage(
+              error,
+              "워크스페이스 자동 저장에 실패했습니다.",
+            ),
             "오류",
             "destructive",
           )
         }
       }, 700)
     },
-    [currentWorkspace, documentId, isRealDocument, queryClient, setWorkspaces],
+    [currentWorkspace, isRealDocument, persistWorkspaceBlocks, setWorkspaces],
   )
 
   const handleCommitConfirm = useCallback(
@@ -381,14 +432,28 @@ export function useDocumentWorkspaceActions({
 
       setIsActionPending(true)
       try {
-        const currentBlocks = currentWorkspace.blocks
+        if (syncTimerRef.current) {
+          window.clearTimeout(syncTimerRef.current)
+          syncTimerRef.current = null
+        }
+
+        const currentBlocks =
+          pendingSaveRef.current?.saveId === currentWorkspace.id
+            ? pendingSaveRef.current.blocks
+            : currentWorkspace.blocks
+
+        await persistWorkspaceBlocks(currentWorkspace.id, currentBlocks)
+        setSyncStatus("synced")
+
         const result = await apiClient.commit.createCommit({
           docId: documentId,
           createCommitRequest: {
             title,
             description,
             blocks: currentBlocks,
-            blockOrders: currentBlocks.map((block, index) => block.id ?? String(index)),
+            blockOrders: currentBlocks.map(
+              (block, index) => block.id ?? String(index),
+            ),
             branchId: currentBranch.id,
           },
         })
@@ -413,6 +478,22 @@ export function useDocumentWorkspaceActions({
           saveId: String(currentWorkspace.id),
         })
         await refreshDocumentState(nextParams, false)
+        setWorkspaces((prev) =>
+          prev.map((workspace) =>
+            workspace.id === currentWorkspace.id
+              ? {
+                  ...workspace,
+                  content: editorDataToMarkdown({
+                    time: Date.now(),
+                    version: "2.30.8",
+                    blocks: currentBlocks,
+                  }),
+                  blocks: currentBlocks,
+                  loaded: true,
+                }
+              : workspace,
+          ),
+        )
         setSearchParams(nextParams, { replace: true })
         setToast("기록 생성됨")
       } catch (error: any) {
@@ -430,8 +511,10 @@ export function useDocumentWorkspaceActions({
       currentWorkspace,
       documentId,
       isRealDocument,
+      persistWorkspaceBlocks,
       refreshDocumentState,
       setSearchParams,
+      setWorkspaces,
       updateGraphData,
     ],
   )
@@ -594,7 +677,9 @@ export function useDocumentWorkspaceActions({
   const handleDeleteCommit = useCallback(
     async (commitId: number) => {
       const targetCommit = commits.find((commit) => commit.id === commitId)
-      const targetBranch = branches.find((branch) => branch.id === targetCommit?.branchId)
+      const targetBranch = branches.find(
+        (branch) => branch.id === targetCommit?.branchId,
+      )
       if (!targetCommit || !targetBranch || !isRealDocument) return
 
       setIsActionPending(true)
@@ -608,7 +693,12 @@ export function useDocumentWorkspaceActions({
         )
         setCommits((prev) => removeCommitRecord(prev, commitId))
         setBranches((prev) =>
-          updateBranchRecordsAfterCommitDelete(prev, commits, targetBranch.id, commitId),
+          updateBranchRecordsAfterCommitDelete(
+            prev,
+            commits,
+            targetBranch.id,
+            commitId,
+          ),
         )
         setDeleteDialog(null)
 
@@ -913,7 +1003,13 @@ export function useDocumentWorkspaceActions({
         setIsActionPending(false)
       }
     },
-    [documentId, isRealDocument, refreshDocumentState, searchParams, updateGraphData],
+    [
+      documentId,
+      isRealDocument,
+      refreshDocumentState,
+      searchParams,
+      updateGraphData,
+    ],
   )
 
   const dispose = useCallback(() => {

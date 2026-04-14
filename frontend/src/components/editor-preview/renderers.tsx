@@ -22,10 +22,6 @@ function dataText(data: BlockData) {
   return normalizeVisibleText(data.text)
 }
 
-function isDelimiterText(text: string) {
-  return /^(\*\s*){3,}$/.test(text.trim()) || /^(-\s*){3,}$/.test(text.trim())
-}
-
 function diffInlineContent(data: BlockData, context: BlockRendererContext) {
   return context.segments?.length
     ? renderDiffSegments({
@@ -48,17 +44,9 @@ function renderParagraphContent(content: ReactNode) {
 const paragraphRenderer: BlockRenderer<BlockData> = {
   extractText: dataText,
   render(data) {
-    if (isDelimiterText(dataText(data))) {
-      return renderDelimiter()
-    }
-
     return renderParagraphContent(renderTextWithBreaks(dataText(data)))
   },
   renderWithDiff(data, context) {
-    if (isDelimiterText(dataText(data))) {
-      return renderDelimiter()
-    }
-
     return renderParagraphContent(diffInlineContent(data, context))
   },
 }

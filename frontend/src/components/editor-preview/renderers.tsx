@@ -22,6 +22,10 @@ function dataText(data: BlockData) {
   return normalizeVisibleText(data.text)
 }
 
+function isDelimiterText(text: string) {
+  return /^(\*\s*){3,}$/.test(text.trim()) || /^(-\s*){3,}$/.test(text.trim())
+}
+
 function diffInlineContent(data: BlockData, context: BlockRendererContext) {
   return context.segments?.length
     ? renderDiffSegments({
@@ -44,9 +48,17 @@ function renderParagraphContent(content: ReactNode) {
 const paragraphRenderer: BlockRenderer<BlockData> = {
   extractText: dataText,
   render(data) {
+    if (isDelimiterText(dataText(data))) {
+      return renderDelimiter()
+    }
+
     return renderParagraphContent(renderTextWithBreaks(dataText(data)))
   },
   renderWithDiff(data, context) {
+    if (isDelimiterText(dataText(data))) {
+      return renderDelimiter()
+    }
+
     return renderParagraphContent(diffInlineContent(data, context))
   },
 }
@@ -179,54 +191,69 @@ const listRenderer: BlockRenderer<BlockData> = {
       side: context.side,
     })
 
-    if (style === "checklist") {
-      return (
-        <div className="cdx-block space-y-1.5 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700">
-          {lines.map((line, index) => {
-            const parsedLine = parseDiffListLine(line, style, index)
+    return (
+      <div className="cdx-block space-y-1 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700">
+        {lines.map((line, index) => {
+          const parsedLine = parseDiffListLine(line, style, index)
+          const marker =
+            parsedLine.marker === "checkbox"
+              ? parsedLine.marker
+              : style === "ordered"
+                ? parsedLine.marker
+                : "•"
 
-            return (
-              <div
-                key={`${lineText(line)}-${index}`}
-                className="flex items-start gap-2.5"
-              >
-                <ChecklistMarker checked={parsedLine.checked} />
-                <span className="min-w-0 break-words pt-px">
-                  {renderDiffTokens({
-                    tokens: parsedLine.tokens,
-                    side: context.side,
-                    isRegionSelected: context.isRegionSelected,
-                    onSelectRegion: context.onSelectRegion,
-                  })}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      )
-    }
-
-    return renderListShell(
-      lines.map((line, index) => {
-        const parsedLine = parseDiffListLine(line, style, index)
-
-        return (
-          <li
-            key={`${lineText(line)}-${index}`}
-            className="cdx-list__item py-[0.08em] pl-[0.1em]"
-          >
-            {renderDiffTokens({
-              tokens: parsedLine.tokens,
-              side: context.side,
-              isRegionSelected: context.isRegionSelected,
-              onSelectRegion: context.onSelectRegion,
-            })}
-          </li>
-        )
-      }),
-      style === "ordered",
+          return (
+            <div
+              key={`${lineText(line)}-${index}`}
+              className="grid grid-cols-[1.65rem_minmax(0,1fr)] items-start gap-2 py-[0.08em]"
+            >
+              <ListMarker
+                marker={marker}
+                checked={parsedLine.checked}
+                ordered={style === "ordered"}
+              />
+              <span className="min-w-0 break-words">
+                {renderDiffTokens({
+                  tokens: parsedLine.tokens,
+                  side: context.side,
+                  isRegionSelected: context.isRegionSelected,
+                  onSelectRegion: context.onSelectRegion,
+                })}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     )
   },
+}
+
+function ListMarker({
+  marker,
+  checked,
+  ordered,
+}: {
+  marker: string | "checkbox"
+  checked: boolean
+  ordered: boolean
+}) {
+  if (marker === "checkbox") {
+    return <ChecklistMarker checked={checked} />
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "mt-[0.02em] flex min-h-7 items-start justify-end pr-1 text-slate-500",
+        ordered
+          ? "text-[0.95em] font-medium tabular-nums"
+          : "text-[1.1em] font-normal",
+      )}
+    >
+      {marker}
+    </span>
+  )
 }
 
 function ChecklistMarker({ checked }: { checked: boolean }) {
@@ -247,25 +274,15 @@ function ChecklistMarker({ checked }: { checked: boolean }) {
 
 function renderChecklist(items: unknown[]): ReactNode {
   return (
-    <div className="cdx-block space-y-1.5 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700">
+    <div className="cdx-block space-y-1 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700">
       {items.map((item, index) => {
         const children = getListItemChildren(item)
         const checked = getListItemChecked(item)
 
         return (
           <div key={`${getListItemText(item)}-${index}`} className="space-y-1">
-            <div className="flex items-start gap-2.5">
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "mt-[0.45em] flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px] font-semibold leading-none transition-colors",
-                  checked
-                    ? "border-slate-500 bg-slate-600 text-white"
-                    : "border-slate-300 bg-white text-transparent",
-                )}
-              >
-                ✓
-              </span>
+            <div className="grid grid-cols-[1.65rem_minmax(0,1fr)] items-start gap-2 py-[0.08em]">
+              <ChecklistMarker checked={checked} />
               <span
                 className={cn(checked ? "text-slate-500" : "text-slate-700")}
               >
@@ -283,41 +300,28 @@ function renderChecklist(items: unknown[]): ReactNode {
 }
 
 function renderList(items: unknown[], ordered: boolean): ReactNode {
-  return renderListShell(
-    items.map((item, index) => {
-      const children = getListItemChildren(item)
-
-      return (
-        <li
-          key={`${getListItemText(item)}-${index}`}
-          className="cdx-list__item py-[0.08em] pl-[0.1em]"
-        >
-          <span>{getListItemText(item)}</span>
-          {children.length ? (
-            <div className="mt-1">{renderList(children, ordered)}</div>
-          ) : null}
-        </li>
-      )
-    }),
-    ordered,
-  )
-}
-
-function renderListShell(items: ReactNode, ordered: boolean): ReactNode {
-  const ListTag = ordered ? "ol" : "ul"
-
   return (
-    <div className="cdx-block">
-      <ListTag
-        className={cn(
-          "cdx-list m-0 pl-[1.35em] text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700",
-          ordered
-            ? "cdx-list--ordered list-decimal"
-            : "cdx-list--unordered list-disc",
-        )}
-      >
-        {items}
-      </ListTag>
+    <div className="cdx-block space-y-1 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-700">
+      {items.map((item, index) => {
+        const children = getListItemChildren(item)
+        const marker = ordered ? `${index + 1}.` : "•"
+
+        return (
+          <div key={`${getListItemText(item)}-${index}`} className="space-y-1">
+            <div className="grid grid-cols-[1.65rem_minmax(0,1fr)] items-start gap-2 py-[0.08em]">
+              <ListMarker marker={marker} checked={false} ordered={ordered} />
+              <span className="min-w-0 break-words">
+                {getListItemText(item)}
+              </span>
+            </div>
+            {children.length ? (
+              <div className="ml-[1.65rem]">
+                {renderList(children, ordered)}
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -327,12 +331,16 @@ const delimiterRenderer: BlockRenderer<BlockData> = {
     return "---"
   },
   render() {
-    return (
-      <div className="ce-delimiter cdx-block flex w-full items-center justify-center py-[1.35em] leading-none">
-        <div className="h-px w-full rounded-full bg-slate-200" />
-      </div>
-    )
+    return renderDelimiter()
   },
+}
+
+function renderDelimiter() {
+  return (
+    <div className="cdx-block flex w-full items-center justify-center py-[1.35em] leading-none">
+      <div className="h-px w-full rounded-full bg-slate-200" />
+    </div>
+  )
 }
 
 const fallbackRenderer: BlockRenderer<BlockData> = {

@@ -1,9 +1,10 @@
-import * as React from "react"
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
-import { createContext, useContext, useState, useCallback } from "react"
+import { AlertTriangle, Info } from "lucide-react"
+import * as React from "react"
+import { createContext, useCallback, useContext, useState } from "react"
 
-import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 function AlertDialog({
   ...props
@@ -139,6 +140,13 @@ function AlertDialogCancel({
       {...props}
     />
   )
+}
+
+function formatDialogDescription(description: string) {
+  return description
+    .replace(/\s+/g, " ")
+    .replace(/([.!?。！？]|[가-힣]\.)\s+(?=\S)/g, "$1\n")
+    .trim()
 }
 
 // Global Dialog System
@@ -279,37 +287,166 @@ function DialogContainer() {
 
   return (
     <>
-      {dialogs.map((dialog) => (
-        <AlertDialog key={dialog.id} open={true}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
-              {dialog.description && (
-                <AlertDialogDescription>
-                  {dialog.description}
-                </AlertDialogDescription>
+      {dialogs.map((dialog) => {
+        const isDestructive = dialog.variant === "destructive"
+        const isCompactAlert = dialog.isAlert
+        const Icon = isDestructive ? AlertTriangle : Info
+        const tone = isDestructive
+          ? {
+              content: "border-red-200",
+              alertCard:
+                "border-red-200/80 bg-white shadow-[0_18px_48px_rgba(127,29,29,0.12)]",
+              alertIcon: "border-red-200 bg-red-50 text-red-500",
+              alertButton: "bg-red-500 text-white hover:bg-red-600",
+              alertTitle: "text-slate-950",
+              alertDescription: "text-slate-600",
+              icon: "text-red-600",
+              title: "text-red-950",
+              action: buttonVariants({ variant: "destructive" }),
+            }
+          : {
+              content: "border-slate-200",
+              alertCard:
+                "border-orange-300/80 bg-white shadow-[0_18px_48px_rgba(180,83,9,0.16)]",
+              alertIcon: "border-orange-200 bg-orange-50 text-orange-500",
+              alertButton: "bg-orange-500 text-white hover:bg-orange-600",
+              alertTitle: "text-slate-950",
+              alertDescription: "text-slate-600",
+              icon: "text-slate-500",
+              title: "text-slate-950",
+              action:
+                "bg-slate-900 text-white hover:bg-slate-800 focus-visible:ring-slate-400",
+            }
+
+        return (
+          <AlertDialog key={dialog.id} open={true}>
+            <AlertDialogContent
+              className={cn(
+                "gap-0 overflow-hidden bg-white p-0 shadow-[0_18px_48px_rgba(15,23,42,0.14)]",
+                isCompactAlert
+                  ? "max-w-[390px] rounded-[18px] sm:max-w-[390px]"
+                  : "max-w-[420px] rounded-2xl sm:max-w-[420px]",
+                isCompactAlert ? tone.alertCard : tone.content,
               )}
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              {!dialog.isAlert && dialog.cancelText && (
-                <AlertDialogCancel onClick={() => hideDialog(dialog.id, false)}>
-                  {dialog.cancelText}
-                </AlertDialogCancel>
+            >
+              {isCompactAlert ? (
+                <div className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3">
+                  <div
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-full border",
+                      tone.alertIcon,
+                    )}
+                  >
+                    <Icon className="h-[18px] w-[18px]" />
+                  </div>
+                  <div className="min-w-0">
+                    <AlertDialogTitle
+                      className={cn(
+                        "truncate text-[13px] font-bold leading-5 tracking-[-0.02em]",
+                        tone.alertTitle,
+                      )}
+                    >
+                      {dialog.title}
+                    </AlertDialogTitle>
+                    {dialog.description && (
+                      <AlertDialogDescription
+                        className={cn(
+                          "mt-0.5 whitespace-pre-line text-[12.5px] leading-5",
+                          tone.alertDescription,
+                        )}
+                      >
+                        {formatDialogDescription(dialog.description)}
+                      </AlertDialogDescription>
+                    )}
+                  </div>
+                  <AlertDialogAction
+                    onClick={() => hideDialog(dialog.id, true)}
+                    className={cn(
+                      "h-8 rounded-xl px-4 text-[12px] font-bold shadow-none",
+                      tone.alertButton,
+                    )}
+                  >
+                    확인
+                  </AlertDialogAction>
+                </div>
+              ) : (
+                <>
+                  <div className={isCompactAlert ? "p-5 pb-3" : "p-6 pb-4"}>
+                    <AlertDialogHeader
+                      className={cn(
+                        isCompactAlert
+                          ? "grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-3 text-left sm:text-left"
+                          : "grid grid-cols-[1.5rem_minmax(0,1fr)] items-start gap-3 text-left sm:text-left",
+                      )}
+                    >
+                      <div className={cn("mt-0.5 flex shrink-0", tone.icon)}>
+                        <Icon
+                          className={isCompactAlert ? "h-4 w-4" : "h-4.5 w-4.5"}
+                        />
+                      </div>
+                      <div
+                        className={cn(
+                          "min-w-0",
+                          isCompactAlert ? "space-y-1.5" : "space-y-2",
+                        )}
+                      >
+                        <AlertDialogTitle
+                          className={cn(
+                            "font-semibold tracking-[-0.03em]",
+                            isCompactAlert ? "text-[16px]" : "text-[17px]",
+                            tone.title,
+                          )}
+                        >
+                          {dialog.title}
+                        </AlertDialogTitle>
+                        {dialog.description && (
+                          <AlertDialogDescription
+                            className={cn(
+                              "whitespace-pre-line text-slate-500",
+                              isCompactAlert
+                                ? "text-[13.5px] leading-6"
+                                : "text-[14px] leading-6",
+                            )}
+                          >
+                            {formatDialogDescription(dialog.description)}
+                          </AlertDialogDescription>
+                        )}
+                      </div>
+                    </AlertDialogHeader>
+                  </div>
+                  <AlertDialogFooter
+                    className={cn(
+                      "bg-white px-5 sm:justify-end",
+                      isCompactAlert
+                        ? "pb-4 pt-0"
+                        : "border-t border-slate-100 py-3.5",
+                    )}
+                  >
+                    {!dialog.isAlert && dialog.cancelText && (
+                      <AlertDialogCancel
+                        onClick={() => hideDialog(dialog.id, false)}
+                        className="h-10 rounded-xl border-slate-200 px-4 text-sm font-semibold text-slate-600 shadow-none hover:bg-slate-50"
+                      >
+                        {dialog.cancelText}
+                      </AlertDialogCancel>
+                    )}
+                    <AlertDialogAction
+                      onClick={() => hideDialog(dialog.id, true)}
+                      className={cn(
+                        "rounded-lg text-sm font-medium shadow-none",
+                        isCompactAlert ? "h-8 px-3.5" : "h-9 px-4",
+                        tone.action,
+                      )}
+                    >
+                      {dialog.confirmText}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </>
               )}
-              <AlertDialogAction
-                onClick={() => hideDialog(dialog.id, true)}
-                className={
-                  dialog.variant === "destructive"
-                    ? cn(buttonVariants({ variant: "destructive" }))
-                    : undefined
-                }
-              >
-                {dialog.confirmText}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      ))}
+            </AlertDialogContent>
+          </AlertDialog>
+        )
+      })}
     </>
   )
 }

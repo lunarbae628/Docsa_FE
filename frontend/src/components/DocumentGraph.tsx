@@ -64,6 +64,7 @@ function AutoFitView({
 }) {
   const { fitView } = useReactFlow()
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 그래프 노드/엣지 수가 바뀔 때 화면을 다시 맞춘다.
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       void fitView({ padding: 0.2, duration: 300 })
@@ -295,7 +296,10 @@ export default function DocumentGraph({
       if (mergeSelection?.active) {
         if (
           onMergeTargetPick &&
-          !(mergeSelection.sourceKind === "commit" && mergeSelection.sourceId === node.data.commit.id)
+          !(
+            mergeSelection.sourceKind === "commit" &&
+            mergeSelection.sourceId === node.data.commit.id
+          )
         ) {
           onMergeTargetPick("commit", node.data.commit.id)
         }
@@ -305,7 +309,10 @@ export default function DocumentGraph({
       if (compareSelection?.active) {
         if (
           onCompareTargetPick &&
-          !(compareSelection.baseKind === "commit" && compareSelection.baseId === node.data.commit.id)
+          !(
+            compareSelection.baseKind === "commit" &&
+            compareSelection.baseId === node.data.commit.id
+          )
         ) {
           onCompareTargetPick("commit", node.data.commit.id)
         }
@@ -324,7 +331,10 @@ export default function DocumentGraph({
       if (mergeSelection?.active) {
         if (
           onMergeTargetPick &&
-          !(mergeSelection.sourceKind === "workspace" && mergeSelection.sourceId === node.data.saveId)
+          !(
+            mergeSelection.sourceKind === "workspace" &&
+            mergeSelection.sourceId === node.data.saveId
+          )
         ) {
           onMergeTargetPick("workspace", node.data.saveId)
         }
@@ -334,7 +344,10 @@ export default function DocumentGraph({
       if (compareSelection?.active) {
         if (
           onCompareTargetPick &&
-          !(compareSelection.baseKind === "workspace" && compareSelection.baseId === node.data.saveId)
+          !(
+            compareSelection.baseKind === "workspace" &&
+            compareSelection.baseId === node.data.saveId
+          )
         ) {
           onCompareTargetPick("workspace", node.data.saveId)
         }
@@ -355,10 +368,10 @@ export default function DocumentGraph({
             </div>
             <div className="mt-1 text-xs text-slate-500">
               {mergeSelection?.active
-                ? "병합할 대상을 그래프에서 선택하세요."
+                ? "병합할 기록을 그래프에서 선택하세요."
                 : compareSelection?.active
-                ? "비교할 대상을 그래프에서 선택하세요."
-                : "브랜치와 편집중 상태를 세로 그래프로 확인합니다."}
+                  ? "비교할 대상을 그래프에서 선택하세요."
+                  : "브랜치와 편집중 상태를 세로 그래프로 확인합니다."}
             </div>
           </div>
         </div>

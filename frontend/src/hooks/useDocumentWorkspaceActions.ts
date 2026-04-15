@@ -656,6 +656,14 @@ export function useDocumentWorkspaceActions({
 
   const handleMergeTargetPick = useCallback(
     (kind: CompareItemKind, id: number) => {
+      if (kind === "workspace") {
+        void alertDialog(
+          "워크스페이스는 기록으로 남긴 뒤 병합할 수 있습니다.",
+          "선택 불가",
+        )
+        return
+      }
+
       setView((prev) => {
         if (prev.mode !== "merge") return prev
         if (kind === prev.sourceKind && id === prev.sourceId) return prev

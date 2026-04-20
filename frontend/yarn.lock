@@ -2799,6 +2799,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"cropperjs@npm:1.5":
+  version: 1.5.13
+  resolution: "cropperjs@npm:1.5.13"
+  checksum: 10c0/9c66807d4fe7056747d2d284cefadf5c27075c732df9cef0902c5fd556d41903b8783fc3c05e1fcd6d4b1efe4c1022c78dded6c7873032349abee0164a16949b
+  languageName: node
+  linkType: hard
+
 "csstype@npm:^3.2.2":
   version: 3.2.3
   resolution: "csstype@npm:3.2.3"
@@ -2975,6 +2982,16 @@ __metadata:
     wcwidth:
       optional: true
   checksum: 10c0/0b7b03723e450c8286bd375bbe7d23247456dbb8f79df055adcfd745bfb91f7604c4e78204ff75d65d5229bec8867cbefca51c57938004f487ff800b587540bb
+  languageName: node
+  linkType: hard
+
+"editorjs-image-resize-crop@npm:^1.1.6":
+  version: 1.1.6
+  resolution: "editorjs-image-resize-crop@npm:1.1.6"
+  dependencies:
+    "@editorjs/editorjs": "npm:^2.30.8"
+    cropperjs: "npm:1.5"
+  checksum: 10c0/c352380c76e7e0e0e7a15cf318a6a3d7bee28d316bf5c0f67265a1b6d0d8dffed7211ef396027044c21c57c321746157d24c742894125b208284a60eeb017c33
   languageName: node
   linkType: hard
 
@@ -3307,6 +3324,7 @@ __metadata:
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
     diff-match-patch: "npm:^1.0.5"
+    editorjs-image-resize-crop: "npm:^1.1.6"
     framer-motion: "npm:^12.38.0"
     globals: "npm:^16.0.0"
     lucide-react: "npm:^0.525.0"

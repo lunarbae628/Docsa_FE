@@ -19,6 +19,7 @@ interface DocumentMergeViewProps {
   title?: string
   baseLabel?: string
   targetLabel?: string
+  documentId?: number
   className?: string
 }
 
@@ -805,6 +806,7 @@ export default function DocumentMergeView({
   title = "기록 병합",
   baseLabel = "병합 원본",
   targetLabel = "병합 대상",
+  documentId,
   className,
 }: DocumentMergeViewProps) {
   const editorRef = useRef<DocumentEditorRef>(null)
@@ -1111,6 +1113,7 @@ export default function DocumentMergeView({
                   ref={editorRef}
                   key="merge-result-editor"
                   isEditable={true}
+                  documentId={documentId}
                   initialData={mergedData}
                   onDataChange={setMergedData}
                   disableAutoUpdate={true}

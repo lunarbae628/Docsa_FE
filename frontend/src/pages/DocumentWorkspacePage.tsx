@@ -628,6 +628,7 @@ export default function DocumentWorkspacePage() {
                       <DocumentEditor
                         key={`workspace-${currentWorkspace.id}`}
                         isEditable={true}
+                        documentId={documentId}
                         initialData={createOutputData(currentWorkspace.blocks)}
                         onDataChange={handleWorkspaceChange}
                         disableAutoUpdate={true}
@@ -651,6 +652,7 @@ export default function DocumentWorkspacePage() {
                       <DocumentEditor
                         key={`commit-${currentCommit.id}`}
                         isEditable={false}
+                        documentId={documentId}
                         initialData={createOutputData(currentCommit.blocks)}
                         minimalChrome={true}
                         contentLayout="document"
@@ -678,6 +680,7 @@ export default function DocumentWorkspacePage() {
                         targetData={mergeTargetData}
                         baseLabel={mergeSourceItem?.title ?? "병합 원본"}
                         targetLabel={mergeTargetItem?.title ?? "병합 대상"}
+                        documentId={documentId}
                         title="기록 병합"
                         className="h-full"
                         onCancel={() =>
@@ -706,6 +709,7 @@ export default function DocumentWorkspacePage() {
                           <DocumentEditor
                             key={`merge-source-${mergeSourceItem?.id ?? "empty"}`}
                             isEditable={false}
+                            documentId={documentId}
                             initialData={
                               mergeSourceData ?? createOutputData([])
                             }
@@ -766,6 +770,7 @@ export default function DocumentWorkspacePage() {
                         <DocumentEditor
                           key={`compare-base-${compareBaseItem?.id ?? "empty"}`}
                           isEditable={false}
+                          documentId={documentId}
                           initialData={compareBaseData ?? createOutputData([])}
                           minimalChrome={true}
                           contentLayout="document"

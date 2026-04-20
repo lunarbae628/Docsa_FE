@@ -1,14 +1,19 @@
+import { apiClient } from "@/api/apiClient"
 import {
   editorDataToMarkdown,
   markdownToEditorData,
 } from "@/lib/editorMarkdown"
+import { alertDialog } from "@/lib/utils"
 import Code from "@editorjs/code"
 import Delimiter from "@editorjs/delimiter"
 import EditorJS, { type OutputData } from "@editorjs/editorjs"
 import Header from "@editorjs/header"
+import ImageTool from "@editorjs/image"
 import List from "@editorjs/list"
 import Paragraph from "@editorjs/paragraph"
 import Quote from "@editorjs/quote"
+import { ImageToolTune } from "editorjs-image-resize-crop"
+import "editorjs-image-resize-crop/dist/index.css"
 import {
   forwardRef,
   useCallback,
@@ -24,6 +29,7 @@ interface DocumentEditorProps {
   onDataChange?: (data: OutputData) => void
   onFocus?: () => void
   onBlur?: () => void
+  documentId?: number
   shouldUpdateOnChange?: boolean // 포커스 상태에 따라 onChange 실행 제어
   disableAutoUpdate?: boolean // initialData 변경 시 자동 업데이트 비활성화
   enableMarkdownShortcuts?: boolean
@@ -69,6 +75,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       onDataChange,
       onFocus,
       onBlur,
+      documentId,
       shouldUpdateOnChange = true,
       disableAutoUpdate = false,
       enableMarkdownShortcuts = false,
@@ -83,6 +90,46 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
     const shouldUpdateOnChangeRef = useRef(shouldUpdateOnChange)
     const isApplyingShortcutRef = useRef(false)
     const lastRenderedDataSignatureRef = useRef("")
+
+    const uploadImageByFile = useCallback(
+      async (file: File) => {
+        if (!documentId) {
+          await alertDialog(
+            "문서 정보를 확인한 뒤 이미지를 다시 업로드해주세요.",
+            "이미지 업로드 실패",
+            "destructive",
+          )
+          return { success: 0 }
+        }
+
+        try {
+          const uploaded = await apiClient.image.uploadEditorImage({
+            docId: documentId,
+            file,
+          })
+
+          return {
+            success: 1,
+            file: {
+              url: uploaded.imageUrl,
+              imageId: uploaded.imageId,
+              objectKey: uploaded.objectKey,
+              contentType: uploaded.contentType,
+              size: uploaded.size,
+              name: file.name,
+            },
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "이미지 업로드에 실패했습니다."
+          await alertDialog(message, "이미지 업로드 실패", "destructive")
+          return { success: 0 }
+        }
+      },
+      [documentId],
+    )
 
     const normalizeBlocksForCompare = useCallback((data: OutputData) => {
       return JSON.stringify(
@@ -221,6 +268,31 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             },
           },
           delimiter: Delimiter,
+          image: {
+            class: ImageTool,
+            inlineToolbar: true,
+            tunes: ["imageResize"],
+            config: {
+              captionPlaceholder: "이미지 설명을 입력하세요",
+              buttonContent: "이미지 업로드",
+              features: {
+                border: true,
+                stretch: true,
+                background: true,
+                caption: true,
+              },
+              uploader: {
+                uploadByFile: uploadImageByFile,
+              },
+            },
+          },
+          imageResize: {
+            class: ImageToolTune,
+            config: {
+              resize: true,
+              crop: false,
+            },
+          },
           paragraph: {
             class: Paragraph,
             inlineToolbar: true,
@@ -329,7 +401,12 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           editorRef.current = null
         }
       }
-    }, [isEditable, enableMarkdownShortcuts, normalizeBlocksForCompare]) // 편집 모드 변경에만 반응
+    }, [
+      isEditable,
+      enableMarkdownShortcuts,
+      normalizeBlocksForCompare,
+      uploadImageByFile,
+    ]) // 편집 모드 변경에만 반응
 
     // initialData 변경 시 에디터 내용 업데이트 (재생성 없이)
     useEffect(() => {
@@ -498,6 +575,75 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             line-height: 1.7;
             padding: 16px 18px;
             box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.75);
+          }
+
+          .document-editor-shell .image-tool {
+            margin: 0.9em 0;
+            max-width: 100%;
+          }
+
+          .document-editor-shell .image-tool__image {
+            overflow: hidden;
+            border-radius: 16px;
+            background: #f8fafc;
+            max-width: 100%;
+            transition:
+              border-color 160ms ease,
+              background-color 160ms ease,
+              padding 160ms ease;
+          }
+
+          .document-editor-shell .image-tool__image-picture {
+            border-radius: 16px;
+            max-width: 100%;
+            margin: 0 auto;
+            object-fit: contain;
+            transition:
+              width 160ms ease,
+              max-width 160ms ease;
+          }
+
+          .document-editor-shell .cdx-image-tool-tune--resize .cdx-block {
+            max-width: 100% !important;
+          }
+
+          .document-editor-shell .cdx-image-tool-tune--resize .image-tool {
+            max-width: 100% !important;
+          }
+
+          .document-editor-shell .image-tool--withBorder .image-tool__image {
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            background: #ffffff;
+          }
+
+          .document-editor-shell .image-tool--withBackground .image-tool__image {
+            border: 1px solid #e2e8f0;
+            padding: 24px;
+            background: #f8fafc;
+          }
+
+          .document-editor-shell .image-tool--withBackground .image-tool__image-picture {
+            max-width: 62%;
+          }
+
+          .document-editor-shell .image-tool--stretched .image-tool__image-picture {
+            width: 100%;
+            max-width: 100%;
+          }
+
+          .document-editor-shell .image-tool__caption {
+            margin-top: 0.65rem;
+            border: 0;
+            box-shadow: none;
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.55;
+            text-align: center;
+          }
+
+          .document-editor-shell .image-tool__caption[contenteditable="true"]:empty::before {
+            color: #94a3b8;
           }
 
           .document-editor-shell .ce-delimiter {

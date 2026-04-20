@@ -5,6 +5,7 @@ export interface EditorBlock {
   id: string
   type: string
   data: Record<string, unknown>
+  tunes?: Record<string, unknown>
 }
 
 export interface BlockDiff {

@@ -24,9 +24,20 @@ interface EditorBlockPreviewProps {
   onSelectRegion?: (regionIndex: number) => void
 }
 
+function getRendererData(block: EditorBlock): Record<string, unknown> {
+  if (!block.tunes) {
+    return block.data
+  }
+
+  return {
+    ...block.data,
+    __tunes: block.tunes,
+  }
+}
+
 export function getVisibleBlockText(block: EditorBlock | undefined): string {
   if (!block?.data) return ""
-  return getBlockRenderer(block.type).extractText(block.data)
+  return getBlockRenderer(block.type).extractText(getRendererData(block))
 }
 
 export default function EditorBlockPreview({
@@ -44,18 +55,19 @@ export default function EditorBlockPreview({
   }
 
   const renderer = getBlockRenderer(block.type)
+  const rendererData = getRendererData(block)
   const isInlineDiff = Boolean(
     segments?.length && canRenderInlineDiff(block.type),
   )
   const blockContent =
     isInlineDiff && renderer.renderWithDiff
-      ? renderer.renderWithDiff(block.data, {
+      ? renderer.renderWithDiff(rendererData, {
           side,
           segments,
           isRegionSelected,
           onSelectRegion,
         })
-      : renderer.render(block.data)
+      : renderer.render(rendererData)
 
   const shouldMarkWholeBlock = status !== "same" && !isInlineDiff
   const wholeBlockClass = shouldMarkWholeBlock

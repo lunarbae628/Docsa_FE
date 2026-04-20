@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import type { ReactNode } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import {
   buildDiffLines,
   lineText,
@@ -331,6 +331,162 @@ function renderDelimiter() {
   )
 }
 
+function getImageUrl(data: BlockData) {
+  const file = data.file
+
+  if (file && typeof file === "object" && "url" in file) {
+    const url = (file as { url?: unknown }).url
+    return typeof url === "string" ? url : ""
+  }
+
+  return ""
+}
+
+function getImageCaption(data: BlockData) {
+  return normalizeVisibleText(data.caption)
+}
+
+function getImageFlag(data: BlockData, key: string) {
+  const value = data[key]
+  return value === true || value === "true"
+}
+
+function getImageResizeTune(data: BlockData) {
+  const tunes = data.__tunes
+  if (!tunes || typeof tunes !== "object" || !("imageResize" in tunes)) {
+    return null
+  }
+
+  const imageResize = (tunes as { imageResize?: unknown }).imageResize
+  if (!imageResize || typeof imageResize !== "object") {
+    return null
+  }
+
+  return imageResize as Record<string, unknown>
+}
+
+function getResizeWidth(data: BlockData) {
+  const tune = getImageResizeTune(data)
+  if (!tune || tune.resize !== true) {
+    return null
+  }
+
+  const resizeSize = Number(tune.resizeSize)
+  return Number.isFinite(resizeSize) && resizeSize > 0 ? resizeSize : null
+}
+
+function getNumberFromTune(tune: Record<string, unknown> | null, key: string) {
+  const value = Number(tune?.[key])
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+
+function getCropStyles(data: BlockData) {
+  const tune = getImageResizeTune(data)
+  if (!tune || tune.crop !== true) {
+    return null
+  }
+
+  const frameWidth = getNumberFromTune(tune, "cropperFrameWidth")
+  const frameHeight = getNumberFromTune(tune, "cropperFrameHeight")
+  const imageWidth = getNumberFromTune(tune, "cropperImageWidth")
+  const imageHeight = getNumberFromTune(tune, "cropperImageHeight")
+
+  if (!frameWidth || !frameHeight || !imageWidth || !imageHeight) {
+    return null
+  }
+
+  return {
+    frameWidth,
+    figure: {
+      width: `${frameWidth}px`,
+      maxWidth: "100%",
+    } satisfies CSSProperties,
+    imageWrap: {
+      position: "relative",
+      width: `${frameWidth}px`,
+      maxWidth: "100%",
+      height: `${frameHeight}px`,
+    } satisfies CSSProperties,
+    image: {
+      position: "absolute",
+      width: `${imageWidth}px`,
+      maxWidth: "none",
+      height: `${imageHeight}px`,
+      left: `${Number(tune.cropperFrameLeft ?? 0)}px`,
+      top: `${Number(tune.cropperFrameTop ?? 0)}px`,
+    } satisfies CSSProperties,
+  }
+}
+
+const imageRenderer: BlockRenderer<BlockData> = {
+  extractText(data) {
+    const caption = getImageCaption(data)
+    const url = getImageUrl(data)
+    return [caption, url].filter(Boolean).join(" ")
+  },
+  render(data) {
+    const url = getImageUrl(data)
+    const caption = getImageCaption(data)
+    const withBorder = getImageFlag(data, "withBorder")
+    const withBackground = getImageFlag(data, "withBackground")
+    const stretched = getImageFlag(data, "stretched")
+    const resizeWidth = getResizeWidth(data)
+    const cropStyles = getCropStyles(data)
+
+    return (
+      <figure
+        className={cn(
+          "image-tool cdx-block my-[0.9em]",
+          withBorder && "image-tool--withBorder",
+          withBackground && "image-tool--withBackground",
+          stretched && "image-tool--stretched",
+          cropStyles && "cdx-image-tool-tune--crop",
+          caption && "image-tool--caption",
+        )}
+        style={
+          cropStyles?.figure ??
+          (resizeWidth
+            ? { width: `min(${resizeWidth}px, 100%)`, maxWidth: "100%" }
+            : undefined)
+        }
+      >
+        {url ? (
+          <div
+            className={cn(
+              "image-tool__image overflow-hidden rounded-2xl bg-slate-50",
+              withBorder && "border border-slate-300 bg-white p-2",
+              withBackground && "border border-slate-200 bg-slate-50 p-6",
+            )}
+            style={cropStyles?.imageWrap}
+          >
+            <img
+              src={url}
+              alt={caption || "첨부 이미지"}
+              className={cn(
+                "image-tool__image-picture mx-auto block max-h-[520px] rounded-2xl object-contain",
+                stretched ? "w-full max-w-full" : "max-w-full",
+                withBackground && !stretched && "max-w-[62%]",
+                cropStyles && "isCropped",
+              )}
+              style={cropStyles?.image}
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <div className="flex min-h-44 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+            이미지를 불러올 수 없습니다.
+          </div>
+        )}
+        {caption ? (
+          <figcaption className="image-tool__caption mt-2 text-center text-[0.9rem] leading-6 text-slate-500">
+            {caption}
+          </figcaption>
+        ) : null}
+      </figure>
+    )
+  },
+}
+
 const fallbackRenderer: BlockRenderer<BlockData> = {
   extractText(data) {
     return String(data.text ?? JSON.stringify(data))
@@ -349,6 +505,7 @@ const rendererRegistry: Record<string, BlockRenderer<BlockData>> = {
   code: codeRenderer,
   list: listRenderer,
   delimiter: delimiterRenderer,
+  image: imageRenderer,
 }
 
 export function getBlockRenderer(type: string): BlockRenderer<BlockData> {

@@ -353,16 +353,32 @@ function getImageFlag(data: BlockData, key: string) {
 
 function getImageResizeTune(data: BlockData) {
   const tunes = data.__tunes
-  if (!tunes || typeof tunes !== "object" || !("imageResize" in tunes)) {
-    return null
+  const explicitTunes = data.tunes
+
+  const candidates: unknown[] = [
+    data.imageResize,
+    data.imageTune,
+    tunes && typeof tunes === "object"
+      ? (tunes as { imageResize?: unknown }).imageResize
+      : null,
+    tunes && typeof tunes === "object"
+      ? (tunes as { imageTune?: unknown }).imageTune
+      : null,
+    explicitTunes && typeof explicitTunes === "object"
+      ? (explicitTunes as { imageResize?: unknown }).imageResize
+      : null,
+    explicitTunes && typeof explicitTunes === "object"
+      ? (explicitTunes as { imageTune?: unknown }).imageTune
+      : null,
+  ]
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object") {
+      return candidate as Record<string, unknown>
+    }
   }
 
-  const imageResize = (tunes as { imageResize?: unknown }).imageResize
-  if (!imageResize || typeof imageResize !== "object") {
-    return null
-  }
-
-  return imageResize as Record<string, unknown>
+  return null
 }
 
 function getResizeWidth(data: BlockData) {
@@ -371,12 +387,15 @@ function getResizeWidth(data: BlockData) {
     return null
   }
 
-  const resizeSize = Number(tune.resizeSize)
-  return Number.isFinite(resizeSize) && resizeSize > 0 ? resizeSize : null
+  return getNumberFromTune(tune, "resizeSize")
 }
 
 function getNumberFromTune(tune: Record<string, unknown> | null, key: string) {
-  const value = Number(tune?.[key])
+  const rawValue = tune?.[key]
+  const value =
+    typeof rawValue === "string"
+      ? Number.parseFloat(rawValue)
+      : Number(rawValue)
   return Number.isFinite(value) && value > 0 ? value : null
 }
 
@@ -412,8 +431,8 @@ function getCropStyles(data: BlockData) {
       width: `${imageWidth}px`,
       maxWidth: "none",
       height: `${imageHeight}px`,
-      left: `${Number(tune.cropperFrameLeft ?? 0)}px`,
-      top: `${Number(tune.cropperFrameTop ?? 0)}px`,
+      left: `${getNumberFromTune(tune, "cropperFrameLeft") ?? 0}px`,
+      top: `${getNumberFromTune(tune, "cropperFrameTop") ?? 0}px`,
     } satisfies CSSProperties,
   }
 }
@@ -446,7 +465,7 @@ const imageRenderer: BlockRenderer<BlockData> = {
         style={
           cropStyles?.figure ??
           (resizeWidth
-            ? { width: `min(${resizeWidth}px, 100%)`, maxWidth: "100%" }
+            ? { width: `${resizeWidth}px`, maxWidth: "100%" }
             : undefined)
         }
       >
@@ -463,12 +482,17 @@ const imageRenderer: BlockRenderer<BlockData> = {
               src={url}
               alt={caption || "첨부 이미지"}
               className={cn(
-                "image-tool__image-picture mx-auto block max-h-[520px] rounded-2xl object-contain",
+                "image-tool__image-picture mx-auto block rounded-2xl object-contain",
                 stretched ? "w-full max-w-full" : "max-w-full",
-                withBackground && !stretched && "max-w-[62%]",
+                withBackground && !stretched && !resizeWidth && "max-w-[62%]",
                 cropStyles && "isCropped",
               )}
-              style={cropStyles?.image}
+              style={
+                cropStyles?.image ??
+                (resizeWidth || stretched
+                  ? { width: "100%", height: "auto" }
+                  : undefined)
+              }
               loading="lazy"
             />
           </div>

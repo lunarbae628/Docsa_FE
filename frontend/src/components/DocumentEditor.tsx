@@ -1,4 +1,5 @@
 import { apiClient } from "@/api/apiClient"
+import { ResizeOnlyImageTune } from "@/lib/editorImageTune"
 import {
   editorDataToMarkdown,
   markdownToEditorData,
@@ -12,7 +13,6 @@ import ImageTool from "@editorjs/image"
 import List from "@editorjs/list"
 import Paragraph from "@editorjs/paragraph"
 import Quote from "@editorjs/quote"
-import { ImageToolTune } from "editorjs-image-resize-crop"
 import "editorjs-image-resize-crop/dist/index.css"
 import {
   forwardRef,
@@ -47,6 +47,87 @@ function createOutputData(blocks: OutputData["blocks"]): OutputData {
     time: Date.now(),
     version: "2.30.8",
     blocks,
+  }
+}
+
+const IMAGE_RESIZE_TUNE_KEYS = ["resize", "resizeSize"] as const
+
+function parseFiniteNumber(value: unknown) {
+  const numberValue =
+    typeof value === "string" ? Number.parseFloat(value) : Number(value)
+
+  return Number.isFinite(numberValue) ? numberValue : null
+}
+
+function sanitizeImageResizeTune(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return undefined
+  }
+
+  const source = value as Record<string, unknown>
+  const sanitized: Record<string, boolean | number> = {}
+
+  for (const key of IMAGE_RESIZE_TUNE_KEYS) {
+    if (!(key in source)) {
+      continue
+    }
+
+    if (key === "resize") {
+      sanitized[key] = source[key] === true || source[key] === "true"
+      continue
+    }
+
+    const numberValue = parseFiniteNumber(source[key])
+    if (numberValue !== null) {
+      sanitized[key] = numberValue
+    }
+  }
+
+  return Object.keys(sanitized).length ? sanitized : undefined
+}
+
+function sanitizeBlockTunes(tunes: unknown) {
+  if (!tunes || typeof tunes !== "object") {
+    return undefined
+  }
+
+  const source = tunes as Record<string, unknown>
+  const sanitized: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(source)) {
+    if (key === "imageResize" || key === "imageTune") {
+      const imageResizeTune = sanitizeImageResizeTune(value)
+      if (imageResizeTune) {
+        sanitized[key] = imageResizeTune
+      }
+      continue
+    }
+
+    sanitized[key] = value
+  }
+
+  return Object.keys(sanitized).length ? sanitized : undefined
+}
+
+function sanitizeEditorOutputData(data: OutputData): OutputData {
+  return {
+    ...data,
+    blocks: data.blocks.map((block) => {
+      const blockWithTunes = block as typeof block & {
+        tunes?: Record<string, unknown>
+      }
+      const sanitizedTunes = sanitizeBlockTunes(blockWithTunes.tunes)
+
+      if (!sanitizedTunes) {
+        const { tunes: _tunes, ...blockWithoutTunes } = blockWithTunes
+        return blockWithoutTunes
+      }
+
+      return {
+        ...block,
+        tunes: sanitizedTunes,
+      }
+    }),
   }
 }
 
@@ -182,7 +263,9 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
     const saveData = useCallback(async (): Promise<OutputData | null> => {
       if (editorRef.current) {
         try {
-          const outputData = await editorRef.current.save()
+          const outputData = sanitizeEditorOutputData(
+            await editorRef.current.save(),
+          )
           return outputData
         } catch (error) {
           console.error("Error saving data:", error)
@@ -287,7 +370,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             },
           },
           imageResize: {
-            class: ImageToolTune,
+            class: ResizeOnlyImageTune,
             config: {
               resize: true,
               crop: false,
@@ -308,7 +391,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
 
           if (onDataChange && isEditable && shouldUpdateOnChangeRef.current) {
             try {
-              const outputData = await editor.save()
+              const outputData = sanitizeEditorOutputData(await editor.save())
 
               if (enableMarkdownShortcuts) {
                 const transformedData = applyMarkdownShortcuts(outputData)
@@ -609,6 +692,15 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
 
           .document-editor-shell .cdx-image-tool-tune--resize .image-tool {
             max-width: 100% !important;
+          }
+
+          .document-editor-shell .cdx-image-tool-tune--resize .cdx-block .resizable .resizers .resizer {
+            z-index: 6;
+            width: 14px;
+            height: 14px;
+            border: 3px solid #0f766e;
+            background: #ecfdf5;
+            box-shadow: 0 6px 16px rgb(15 118 110 / 0.18);
           }
 
           .document-editor-shell .image-tool--withBorder .image-tool__image {

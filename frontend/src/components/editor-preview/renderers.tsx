@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import type { CSSProperties, ReactNode } from "react"
+import type { ReactNode } from "react"
 import {
   buildDiffLines,
   lineText,
@@ -399,49 +399,19 @@ function getNumberFromTune(tune: Record<string, unknown> | null, key: string) {
   return Number.isFinite(value) && value > 0 ? value : null
 }
 
-function getCropStyles(data: BlockData) {
-  const tune = getImageResizeTune(data)
-  if (!tune || tune.crop !== true) {
-    return null
-  }
-
-  const frameWidth = getNumberFromTune(tune, "cropperFrameWidth")
-  const frameHeight = getNumberFromTune(tune, "cropperFrameHeight")
-  const imageWidth = getNumberFromTune(tune, "cropperImageWidth")
-  const imageHeight = getNumberFromTune(tune, "cropperImageHeight")
-
-  if (!frameWidth || !frameHeight || !imageWidth || !imageHeight) {
-    return null
-  }
-
-  return {
-    frameWidth,
-    figure: {
-      width: `${frameWidth}px`,
-      maxWidth: "100%",
-    } satisfies CSSProperties,
-    imageWrap: {
-      position: "relative",
-      width: `${frameWidth}px`,
-      maxWidth: "100%",
-      height: `${frameHeight}px`,
-    } satisfies CSSProperties,
-    image: {
-      position: "absolute",
-      width: `${imageWidth}px`,
-      maxWidth: "none",
-      height: `${imageHeight}px`,
-      left: `${getNumberFromTune(tune, "cropperFrameLeft") ?? 0}px`,
-      top: `${getNumberFromTune(tune, "cropperFrameTop") ?? 0}px`,
-    } satisfies CSSProperties,
-  }
-}
-
 const imageRenderer: BlockRenderer<BlockData> = {
   extractText(data) {
     const caption = getImageCaption(data)
     const url = getImageUrl(data)
-    return [caption, url].filter(Boolean).join(" ")
+    const resizeWidth = getResizeWidth(data)
+    const visualSignature = [
+      `resize:${resizeWidth ?? "auto"}`,
+      `stretched:${getImageFlag(data, "stretched")}`,
+      `border:${getImageFlag(data, "withBorder")}`,
+      `background:${getImageFlag(data, "withBackground")}`,
+    ].join("|")
+
+    return [caption, url, visualSignature].filter(Boolean).join(" ")
   },
   render(data) {
     const url = getImageUrl(data)
@@ -450,7 +420,6 @@ const imageRenderer: BlockRenderer<BlockData> = {
     const withBackground = getImageFlag(data, "withBackground")
     const stretched = getImageFlag(data, "stretched")
     const resizeWidth = getResizeWidth(data)
-    const cropStyles = getCropStyles(data)
 
     return (
       <figure
@@ -459,14 +428,12 @@ const imageRenderer: BlockRenderer<BlockData> = {
           withBorder && "image-tool--withBorder",
           withBackground && "image-tool--withBackground",
           stretched && "image-tool--stretched",
-          cropStyles && "cdx-image-tool-tune--crop",
           caption && "image-tool--caption",
         )}
         style={
-          cropStyles?.figure ??
-          (resizeWidth
+          resizeWidth
             ? { width: `${resizeWidth}px`, maxWidth: "100%" }
-            : undefined)
+            : undefined
         }
       >
         {url ? (
@@ -476,7 +443,6 @@ const imageRenderer: BlockRenderer<BlockData> = {
               withBorder && "border border-slate-300 bg-white p-2",
               withBackground && "border border-slate-200 bg-slate-50 p-6",
             )}
-            style={cropStyles?.imageWrap}
           >
             <img
               src={url}
@@ -485,13 +451,11 @@ const imageRenderer: BlockRenderer<BlockData> = {
                 "image-tool__image-picture mx-auto block rounded-2xl object-contain",
                 stretched ? "w-full max-w-full" : "max-w-full",
                 withBackground && !stretched && !resizeWidth && "max-w-[62%]",
-                cropStyles && "isCropped",
               )}
               style={
-                cropStyles?.image ??
-                (resizeWidth || stretched
+                resizeWidth || stretched
                   ? { width: "100%", height: "auto" }
-                  : undefined)
+                  : undefined
               }
               loading="lazy"
             />

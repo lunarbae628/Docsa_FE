@@ -106,18 +106,7 @@ const imageApi = {
     })
 
     if (!response.ok) {
-      const errorText = await response
-        .clone()
-        .text()
-        .catch(() => "")
-      const code = errorText.match(/<Code>([^<]+)<\/Code>/)?.[1]
-      const message = errorText.match(/<Message>([^<]+)<\/Message>/)?.[1]
-      const detail = [code, message].filter(Boolean).join(": ")
-      throw new Error(
-        detail
-          ? `이미지 파일 업로드에 실패했습니다. ${detail}`
-          : "이미지 파일 업로드에 실패했습니다.",
-      )
+      throw new Error("이미지 파일 업로드에 실패했습니다.")
     }
   },
   completeUpload(imageId: number) {

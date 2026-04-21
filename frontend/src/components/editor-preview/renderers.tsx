@@ -19,7 +19,12 @@ import {
   normalizeListStyle,
 } from "./list"
 import { blockTone } from "./styles"
-import { normalizeVisibleText, renderTextWithBreaks } from "./text"
+import {
+  normalizeInlineDiffText,
+  normalizeVisibleText,
+  renderRichTextWithBreaks,
+  renderTextWithBreaks,
+} from "./text"
 import type {
   BlockRenderer,
   BlockRendererContext,
@@ -51,6 +56,10 @@ function dataText(data: BlockData) {
   return normalizeVisibleText(data.text)
 }
 
+function dataInlineDiffText(data: BlockData) {
+  return normalizeInlineDiffText(data.text)
+}
+
 function diffInlineContent(data: BlockData, context: BlockRendererContext) {
   return context.segments?.length
     ? renderDiffSegments({
@@ -72,8 +81,9 @@ function renderParagraphContent(content: ReactNode) {
 
 const paragraphRenderer: BlockRenderer<BlockData> = {
   extractText: dataText,
+  extractDiffText: dataInlineDiffText,
   render(data) {
-    return renderParagraphContent(renderTextWithBreaks(dataText(data)))
+    return renderParagraphContent(renderRichTextWithBreaks(data.text))
   },
   renderWithDiff(data, context) {
     return renderParagraphContent(diffInlineContent(data, context))
@@ -82,8 +92,9 @@ const paragraphRenderer: BlockRenderer<BlockData> = {
 
 const headerRenderer: BlockRenderer<BlockData> = {
   extractText: dataText,
+  extractDiffText: dataInlineDiffText,
   render(data) {
-    return renderHeader(data, renderTextWithBreaks(dataText(data)))
+    return renderHeader(data, renderRichTextWithBreaks(data.text))
   },
   renderWithDiff(data, context) {
     return renderHeader(data, diffInlineContent(data, context))
@@ -114,8 +125,16 @@ function renderHeader(data: BlockData, content: ReactNode) {
 
 const quoteRenderer: BlockRenderer<BlockData> = {
   extractText: dataText,
+  extractDiffText(data) {
+    return [
+      normalizeInlineDiffText(data.text),
+      normalizeInlineDiffText(data.caption),
+    ]
+      .filter(Boolean)
+      .join("\n")
+  },
   render(data) {
-    return renderQuote(data, renderTextWithBreaks(dataText(data)))
+    return renderQuote(data, renderRichTextWithBreaks(data.text))
   },
   renderWithDiff(data, context) {
     return renderQuote(data, diffInlineContent(data, context))
@@ -123,12 +142,20 @@ const quoteRenderer: BlockRenderer<BlockData> = {
 }
 
 function renderQuote(data: BlockData, content: ReactNode) {
+  const alignment = data.alignment === "center" ? "center" : "left"
+
   return (
-    <blockquote className="cdx-block cdx-quote my-2 border-l-[3px] border-slate-300 py-1 pl-4 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-600">
+    <blockquote
+      className={cn(
+        "cdx-block cdx-quote my-2 border-l-[3px] border-slate-300 py-1 pl-4 text-[16px] leading-[1.78] tracking-[-0.01em] text-slate-600",
+        alignment === "center" && "text-center",
+      )}
+      data-alignment={alignment}
+    >
       <div className="cdx-quote__text">{content}</div>
       {data.caption ? (
         <footer className="cdx-quote__caption mt-1 text-[0.9em] leading-6 text-slate-400">
-          {normalizeVisibleText(data.caption)}
+          {renderRichTextWithBreaks(data.caption)}
         </footer>
       ) : null}
     </blockquote>
@@ -140,7 +167,11 @@ const codeRenderer: BlockRenderer<BlockData> = {
     return String(data.code ?? "")
   },
   render(data) {
-    return renderCode(renderTextWithBreaks(String(data.code ?? "")))
+    const language = getCodeLanguage(data)
+    return renderCode(
+      renderHighlightedCode(String(data.code ?? ""), language),
+      language,
+    )
   },
   renderWithDiff(data, context) {
     const content = context.segments?.length
@@ -152,13 +183,82 @@ const codeRenderer: BlockRenderer<BlockData> = {
         })
       : renderTextWithBreaks(String(data.code ?? ""))
 
-    return renderCode(content)
+    return renderCode(content, getCodeLanguage(data))
   },
 }
 
-function renderCode(content: ReactNode) {
+function getCodeLanguage(data: BlockData) {
+  const language = data.language
+  return typeof language === "string" && language ? language : "plain"
+}
+
+function getCodeLanguageLabel(language: string) {
+  const labels: Record<string, string> = {
+    plain: "Plain text",
+    javascript: "JavaScript",
+    typescript: "TypeScript",
+    java: "Java",
+    sql: "SQL",
+    json: "JSON",
+  }
+
+  return labels[language] ?? language
+}
+
+function renderHighlightedCode(code: string, language: string) {
+  if (language === "plain") {
+    return code
+  }
+
+  const keywordPatterns: Record<string, string> = {
+    javascript:
+      "\\b(?:const|let|var|function|return|async|await|if|else|for|while|import|export|from|class|new|try|catch|throw)\\b",
+    typescript:
+      "\\b(?:const|let|var|function|return|async|await|if|else|for|while|import|export|from|class|new|try|catch|throw|type|interface|implements|extends)\\b",
+    java: "\\b(?:public|private|protected|class|interface|return|new|if|else|for|while|try|catch|throw|void|static|final)\\b",
+    sql: "\\b(?:select|from|where|join|left|right|inner|outer|insert|update|delete|into|values|group|order|by|limit|and|or|as)\\b",
+    json: "\\b(?:true|false|null)\\b",
+  }
+  const keywordPattern = keywordPatterns[language]
+  const tokenPattern = new RegExp(
+    `("(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*'|//[^\\n]*|/\\*[\\s\\S]*?\\*/|\\b\\d+(?:\\.\\d+)?\\b${keywordPattern ? `|${keywordPattern}` : ""})`,
+    "gi",
+  )
+
+  return code.split(tokenPattern).map((part, index) => {
+    if (!part) return null
+    const lower = part.toLowerCase()
+    const isString = /^["']/.test(part)
+    const isComment = part.startsWith("//") || part.startsWith("/*")
+    const isNumber = /^\d/.test(part)
+    const isKeyword = keywordPattern
+      ? new RegExp(keywordPattern, "i").test(part)
+      : false
+
+    return (
+      <span
+        key={`${part}-${index}`}
+        className={cn(
+          isString && "text-emerald-700",
+          isComment && "text-slate-400",
+          isNumber && "text-blue-700",
+          isKeyword && lower && "font-semibold text-indigo-700",
+        )}
+      >
+        {part}
+      </span>
+    )
+  })
+}
+
+function renderCode(content: ReactNode, language = "plain") {
   return (
-    <div className="ce-code cdx-block my-[0.65em]">
+    <div className="ce-code cdx-block relative my-[0.65em]">
+      {language !== "plain" ? (
+        <div className="ce-code__language absolute right-3 top-2 z-10 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold leading-5 text-slate-500 shadow-sm ring-1 ring-slate-200">
+          {getCodeLanguageLabel(language)}
+        </div>
+      ) : null}
       <pre className="ce-code__textarea m-0 min-h-[120px] w-full overflow-auto rounded-[14px] border border-slate-200 bg-slate-50 px-[18px] py-4 font-mono text-[0.92rem] leading-[1.7] text-slate-700 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.75)]">
         <code>{content}</code>
       </pre>
@@ -178,6 +278,22 @@ const listRenderer: BlockRenderer<BlockData> = {
     return items
       .map((item, index) => {
         const text = getListItemText(item)
+        if (style === "checklist") {
+          const checked = getListItemChecked(item) ? "[x]" : "[ ]"
+          return `${checked} ${text}`
+        }
+        return style === "ordered" ? `${index + 1}. ${text}` : `• ${text}`
+      })
+      .filter(Boolean)
+      .join("\n")
+  },
+  extractDiffText(data) {
+    const items = getListItems(data)
+    const style = normalizeListStyle(data.style)
+
+    return items
+      .map((item, index) => {
+        const text = normalizeInlineDiffText(getListItemText(item))
         if (style === "checklist") {
           const checked = getListItemChecked(item) ? "[x]" : "[ ]"
           return `${checked} ${text}`
@@ -303,7 +419,7 @@ function renderChecklist(items: unknown[]): ReactNode {
               <span
                 className={cn(checked ? "text-slate-500" : "text-slate-700")}
               >
-                {getListItemText(item)}
+                {renderRichTextWithBreaks(getListItemText(item))}
               </span>
             </div>
             {children.length ? (
@@ -328,7 +444,7 @@ function renderList(items: unknown[], ordered: boolean): ReactNode {
             <div className="grid grid-cols-[1.65rem_minmax(0,1fr)] items-start gap-2 py-[0.08em]">
               <ListMarker marker={marker} checked={false} ordered={ordered} />
               <span className="min-w-0 break-words">
-                {getListItemText(item)}
+                {renderRichTextWithBreaks(getListItemText(item))}
               </span>
             </div>
             {children.length ? (
@@ -509,30 +625,8 @@ const imageRenderer: BlockRenderer<BlockData> = {
       return imageRenderer.render(data)
     }
 
-    const currentUrl = getImageUrl(data)
-    const compareUrl = getImageUrl(compareData)
-    const currentCaption = getImageCaption(data)
-    const compareCaption = getImageCaption(compareData)
-    const currentWidth = getResizeWidth(data)
-    const compareWidth = getResizeWidth(compareData)
-    const currentFlags = [
-      getImageFlag(data, "stretched"),
-      getImageFlag(data, "withBorder"),
-      getImageFlag(data, "withBackground"),
-    ].join("|")
-    const compareFlags = [
-      getImageFlag(compareData, "stretched"),
-      getImageFlag(compareData, "withBorder"),
-      getImageFlag(compareData, "withBackground"),
-    ].join("|")
     const selected =
       context.isRegionSelected?.(VISUAL_BLOCK_REGION_INDEX) ?? false
-    const labels = [
-      currentUrl !== compareUrl ? "이미지 변경" : null,
-      currentWidth !== compareWidth ? "크기 변경" : null,
-      currentCaption !== compareCaption ? "캡션 변경" : null,
-      currentFlags !== compareFlags ? "스타일 변경" : null,
-    ].filter(Boolean)
     const content = (
       <div
         className={cn(
@@ -541,18 +635,6 @@ const imageRenderer: BlockRenderer<BlockData> = {
           context.onSelectRegion ? "cursor-pointer hover:bg-slate-50" : "",
         )}
       >
-        {labels.length ? (
-          <div className="absolute right-3 top-3 z-10 flex flex-wrap justify-end gap-1.5">
-            {labels.map((label) => (
-              <span
-                key={label}
-                className="rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200"
-              >
-                {label}
-              </span>
-            ))}
-          </div>
-        ) : null}
         {imageRenderer.render(data)}
       </div>
     )
@@ -648,6 +730,25 @@ function blockText(block: PreviewBlock | undefined) {
   return renderer.extractText(rendererData)
 }
 
+function blockComparableText(block: PreviewBlock | undefined) {
+  if (!block?.type || !block.data) {
+    return ""
+  }
+
+  const renderer = getBlockRenderer(block.type)
+  const rendererData = block.tunes
+    ? {
+        ...block.data,
+        __tunes: block.tunes,
+      }
+    : block.data
+
+  return (
+    renderer.extractDiffText?.(rendererData) ??
+    renderer.extractText(rendererData)
+  )
+}
+
 function renderNestedBlockWithDiff({
   block,
   compareBlock,
@@ -694,10 +795,13 @@ function renderNestedBlockWithDiff({
           )
       : undefined,
   }
+  const hasVisibleTextDiff =
+    compareBlock && blockText(block) !== blockText(compareBlock)
   const canInlineDiff = Boolean(
     compareBlock?.type === block.type &&
       context.buildSegments &&
-      renderer.renderWithDiff,
+      renderer.renderWithDiff &&
+      hasVisibleTextDiff,
   )
 
   if (canInlineDiff && compareBlock) {
@@ -774,6 +878,19 @@ const columnsRenderer: BlockRenderer<BlockData> = {
 
             return renderer.extractText(rendererData)
           })
+          .filter(Boolean)
+          .join("\n\n")
+
+        return `column:${columnIndex + 1}\n${text}`
+      })
+      .join("\n\n")
+  },
+  extractDiffText(data) {
+    return getColumns(data)
+      .map((column, columnIndex) => {
+        const blocks = getColumnBlocks(column)
+        const text = blocks
+          .map((block) => blockComparableText(block))
           .filter(Boolean)
           .join("\n\n")
 

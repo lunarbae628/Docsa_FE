@@ -43,6 +43,17 @@ export function getVisibleBlockText(block: EditorBlock | undefined): string {
   return getBlockRenderer(block.type).extractText(getRendererData(block))
 }
 
+export function getComparableBlockText(block: EditorBlock | undefined): string {
+  if (!block?.data) return ""
+  const renderer = getBlockRenderer(block.type)
+  const rendererData = getRendererData(block)
+
+  return (
+    renderer.extractDiffText?.(rendererData) ??
+    renderer.extractText(rendererData)
+  )
+}
+
 function handleKeyboardSelect(
   event: KeyboardEvent<HTMLDivElement>,
   onSelect: () => void,

@@ -26,10 +26,12 @@ const SIDEBAR_DOCUMENT_PAGE_SIZE = 10
 
 type DocumentSidebarQuickMenuProps = {
   currentDocumentId: number
+  triggerLabel?: string
 }
 
 export default function DocumentSidebarQuickMenu({
   currentDocumentId,
+  triggerLabel,
 }: DocumentSidebarQuickMenuProps) {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
@@ -61,11 +63,16 @@ export default function DocumentSidebarQuickMenu({
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          size="icon"
-          className="h-9 w-9 rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
+          size={triggerLabel ? "sm" : "icon"}
+          className={`h-9 rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 ${
+            triggerLabel ? "gap-2 px-3" : "w-9"
+          }`}
           aria-label="문서 목록 열기"
         >
           <Menu className="h-4 w-4" />
+          {triggerLabel ? (
+            <span className="text-sm font-semibold">{triggerLabel}</span>
+          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

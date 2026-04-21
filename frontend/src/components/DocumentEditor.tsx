@@ -1,21 +1,22 @@
 import { apiClient } from "@/api/apiClient"
+import { CodeWithLanguage } from "@/lib/editorCodeTool"
 import { ColumnsTool } from "@/lib/editorColumnsTool"
 import { ResizeOnlyImageTune } from "@/lib/editorImageTune"
 import {
   editorDataToMarkdown,
   markdownToEditorData,
 } from "@/lib/editorMarkdown"
+import { AlignedQuote } from "@/lib/editorQuoteTool"
 import { alertDialog } from "@/lib/utils"
-import Code from "@editorjs/code"
 import Delimiter from "@editorjs/delimiter"
 import EditorJS, { type OutputData } from "@editorjs/editorjs"
 import Header from "@editorjs/header"
 import ImageTool from "@editorjs/image"
 import List from "@editorjs/list"
 import Paragraph from "@editorjs/paragraph"
-import Quote from "@editorjs/quote"
 import "editorjs-image-resize-crop/dist/index.css"
 import {
+  type KeyboardEvent,
   forwardRef,
   useCallback,
   useEffect,
@@ -219,6 +220,9 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
     const shouldUpdateOnChangeRef = useRef(shouldUpdateOnChange)
     const isApplyingShortcutRef = useRef(false)
     const lastRenderedDataSignatureRef = useRef("")
+    const lastEnterEventRef = useRef<{
+      time: number
+    } | null>(null)
 
     const uploadImageByFile = useCallback(
       async (file: File) => {
@@ -342,6 +346,34 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       [saveData, updateData],
     )
 
+    const handleKeyDownCapture = useCallback(
+      (event: KeyboardEvent<HTMLDivElement>) => {
+        if (
+          event.key !== "Enter" ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.nativeEvent.isComposing
+        ) {
+          return
+        }
+
+        const now = performance.now()
+        const lastEnterEvent = lastEnterEventRef.current
+
+        if (lastEnterEvent && now - lastEnterEvent.time < 80) {
+          event.preventDefault()
+          event.stopPropagation()
+          return
+        }
+
+        lastEnterEventRef.current = {
+          time: now,
+        }
+      },
+      [],
+    )
+
     // shouldUpdateOnChange 값을 ref에 동기화
     useEffect(() => {
       shouldUpdateOnChangeRef.current = shouldUpdateOnChange
@@ -362,6 +394,8 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
 
       // Initialize Editor.js with default tools
       lastRenderedDataSignatureRef.current = getDataSignature(initialData)
+      let observer: MutationObserver | null = null
+      let headerStyleTimer: number | null = null
       const editor = new EditorJS({
         holder: containerRef.current,
         readOnly: !isEditable,
@@ -385,7 +419,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             },
           },
           quote: {
-            class: Quote,
+            class: AlignedQuote,
             inlineToolbar: true,
             config: {
               quotePlaceholder: "인용문을 입력하세요",
@@ -393,7 +427,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             },
           },
           code: {
-            class: Code,
+            class: CodeWithLanguage,
             config: {
               placeholder: "코드를 입력하세요",
             },
@@ -445,6 +479,15 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
 
           if (onDataChange && isEditable && shouldUpdateOnChangeRef.current) {
             try {
+              await editor.isReady
+
+              if (
+                editorRef.current !== editor ||
+                typeof editor.save !== "function"
+              ) {
+                return
+              }
+
               const outputData = sanitizeEditorOutputData(await editor.save())
 
               if (enableMarkdownShortcuts) {
@@ -452,6 +495,12 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
 
                 if (transformedData) {
                   isApplyingShortcutRef.current = true
+
+                  if (editorRef.current !== editor) {
+                    isApplyingShortcutRef.current = false
+                    return
+                  }
+
                   await editor.render(transformedData)
                   isApplyingShortcutRef.current = false
                   onDataChange(transformedData)
@@ -467,9 +516,14 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           }
         },
       })
+      editorRef.current = editor
 
       editor.isReady
         .then(() => {
+          if (editorRef.current !== editor) {
+            return
+          }
+
           // Header 스타일 강제 적용 (CSS 우선순위 문제 해결)
           const applyHeaderStyles = () => {
             const headers = containerRef.current?.querySelectorAll(
@@ -512,11 +566,11 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           }
 
           // 초기 적용
-          setTimeout(applyHeaderStyles, 100)
+          headerStyleTimer = window.setTimeout(applyHeaderStyles, 100)
 
           // DOM 변화 감지하여 새로 생성된 헤더에도 스타일 적용
           if (containerRef.current) {
-            const observer = new MutationObserver(() => {
+            observer = new MutationObserver(() => {
               applyHeaderStyles()
             })
             observer.observe(containerRef.current, {
@@ -526,16 +580,26 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           }
 
           setIsReady(true)
-          editorRef.current = editor
         })
         .catch((error) => {
           console.error("Editor.js initialization failed:", error)
         })
 
       return () => {
-        if (editorRef.current) {
-          editorRef.current.destroy()
+        if (headerStyleTimer) {
+          window.clearTimeout(headerStyleTimer)
+        }
+        observer?.disconnect()
+        setIsReady(false)
+
+        if (editorRef.current === editor) {
           editorRef.current = null
+        }
+
+        try {
+          editor.destroy()
+        } catch (error) {
+          console.error("Error destroying editor:", error)
         }
       }
     }, [
@@ -597,6 +661,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           }}
           onFocusCapture={onFocus}
           onBlurCapture={onBlur}
+          onKeyDownCapture={handleKeyDownCapture}
         />
         <style>{`
           .document-editor-shell .codex-editor,
@@ -697,8 +762,113 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             font-size: 0.9em;
           }
 
+          .document-editor-shell .cdx-quote[data-alignment="center"] {
+            text-align: center;
+          }
+
+          .document-editor-shell .cdx-quote[data-alignment="center"] .cdx-quote__text,
+          .document-editor-shell .cdx-quote[data-alignment="center"] .cdx-quote__caption {
+            text-align: center !important;
+          }
+
+          .document-editor-shell .cdx-quote[data-alignment="center"] .cdx-quote__text[data-placeholder]::before,
+          .document-editor-shell .cdx-quote[data-alignment="center"] .cdx-quote__caption[data-placeholder]::before {
+            display: block;
+            width: 100%;
+            text-align: center !important;
+          }
+
           .document-editor-shell .ce-code {
             margin: 0.65em 0;
+            position: relative;
+          }
+
+          .document-editor-shell .ce-code__highlight {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            min-height: 120px;
+            margin: 0;
+            overflow: auto;
+            border: 1px solid transparent;
+            border-radius: 14px;
+            padding: 44px 18px 16px;
+            color: #334155;
+            font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+            font-size: 0.92rem;
+            line-height: 1.7;
+            pointer-events: none;
+            white-space: pre;
+            scrollbar-width: none;
+          }
+
+          .document-editor-shell .ce-code__highlight::-webkit-scrollbar {
+            display: none;
+          }
+
+          .document-editor-shell .ce-code--highlighted .ce-code__textarea {
+            position: relative;
+            z-index: 2;
+            background: transparent !important;
+            color: transparent !important;
+            caret-color: #334155;
+            -webkit-text-fill-color: transparent;
+          }
+
+          .document-editor-shell .code-token--keyword {
+            color: #4338ca;
+            font-weight: 700;
+          }
+
+          .document-editor-shell .code-token--string {
+            color: #047857;
+          }
+
+          .document-editor-shell .code-token--comment {
+            color: #94a3b8;
+          }
+
+          .document-editor-shell .code-token--number {
+            color: #1d4ed8;
+          }
+
+          .document-editor-shell .ce-code__language {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            z-index: 1;
+            border-radius: 999px;
+            background: rgb(255 255 255 / 0.88);
+            padding: 2px 8px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 18px;
+            box-shadow: 0 1px 4px rgb(15 23 42 / 0.08);
+          }
+
+          .document-editor-shell .ce-code__language-select {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            z-index: 2;
+            height: 26px;
+            max-width: 148px;
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            background: rgb(255 255 255 / 0.94);
+            padding: 0 28px 0 10px;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 24px;
+            box-shadow: 0 1px 5px rgb(15 23 42 / 0.1);
+            outline: none;
+          }
+
+          .document-editor-shell .ce-code__language-select:focus {
+            border-color: #94a3b8;
+            box-shadow: 0 0 0 3px rgb(148 163 184 / 0.18);
           }
 
           .document-editor-shell .ce-code__textarea {
@@ -710,7 +880,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
             font-size: 0.92rem;
             line-height: 1.7;
-            padding: 16px 18px;
+            padding: 44px 18px 16px;
             box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.75);
           }
 

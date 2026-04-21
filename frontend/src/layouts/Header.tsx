@@ -1,13 +1,18 @@
-import { Link, useLocation, useNavigate } from "react-router"
-import Logo from "../components/Logo"
+import { apiClient } from "@/api/apiClient"
+import DocumentSidebarQuickMenu from "@/components/DocumentSidebarQuickMenu"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/useAuth"
-import { apiClient } from "@/api/apiClient"
+import { Link, useLocation, useNavigate } from "react-router"
+import Logo from "../components/Logo"
 
 export default function Header() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated, user, logout } = useAuth()
+  const currentDocumentIdMatch = location.pathname.match(/^\/documents\/(\d+)/)
+  const currentDocumentId = currentDocumentIdMatch
+    ? Number(currentDocumentIdMatch[1])
+    : null
 
   const isDocumentSurface =
     location.pathname.startsWith("/documents") ||
@@ -55,6 +60,12 @@ export default function Header() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-2.5">
+              {currentDocumentId ? (
+                <DocumentSidebarQuickMenu
+                  currentDocumentId={currentDocumentId}
+                  triggerLabel="문서"
+                />
+              ) : null}
               {user && (
                 <span
                   className={`rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-600 ${

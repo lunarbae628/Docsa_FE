@@ -350,7 +350,13 @@ export function useDocumentWorkspaceBodyState({
           nextCommits,
           nextWorkspaces,
         )
-        setView((prev) => (isSameView(prev, nextView) ? prev : nextView))
+        setView((prev) => {
+          if (prev.mode === "compare" || prev.mode === "merge") {
+            return prev
+          }
+
+          return isSameView(prev, nextView) ? prev : nextView
+        })
         setHasBootstrapped(true)
 
         if (syncUrl) {
@@ -394,7 +400,13 @@ export function useDocumentWorkspaceBodyState({
     const immediateView = resolveImmediateViewFromParams(searchParams)
     if (!immediateView) return
 
-    setView((prev) => (isSameView(prev, immediateView) ? prev : immediateView))
+    setView((prev) => {
+      if (prev.mode === "compare" || prev.mode === "merge") {
+        return prev
+      }
+
+      return isSameView(prev, immediateView) ? prev : immediateView
+    })
   }, [isRealDocument, searchParams])
 
   useEffect(() => {
@@ -539,7 +551,13 @@ export function useDocumentWorkspaceBodyState({
       commits,
       workspaces,
     )
-    setView((prev) => (isSameView(prev, nextView) ? prev : nextView))
+    setView((prev) => {
+      if (prev.mode === "compare" || prev.mode === "merge") {
+        return prev
+      }
+
+      return isSameView(prev, nextView) ? prev : nextView
+    })
   }, [branches, commits, isRealDocument, searchParams, workspaces])
 
   useEffect(() => {

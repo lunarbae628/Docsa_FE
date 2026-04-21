@@ -24,6 +24,7 @@ export interface BlockRendererContext {
 
 export interface BlockRenderer<TData = Record<string, unknown>> {
   extractText: (data: TData) => string
+  extractDiffText?: (data: TData) => string
   render: (data: TData) => ReactNode
   renderWithDiff?: (data: TData, context: BlockRendererContext) => ReactNode
 }

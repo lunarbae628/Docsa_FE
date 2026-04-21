@@ -105,7 +105,12 @@ export function editorDataToMarkdown(data: OutputData): string {
         }
         case "code": {
           const code = block.data.code ?? ""
-          return ["```", code, "```"].join("\n")
+          const language =
+            typeof block.data.language === "string" &&
+            block.data.language !== "plain"
+              ? block.data.language
+              : ""
+          return [`\`\`\`${language}`, code, "```"].join("\n")
         }
         case "delimiter":
           return "---"
@@ -178,6 +183,7 @@ export function markdownToEditorData(markdown: string): OutputData {
 
     if (/^(```)/.test(line)) {
       const codeLines: string[] = []
+      const language = line.replace(/^```/, "").trim()
       index += 1
       while (index < lines.length && !/^```/.test(lines[index].trim())) {
         codeLines.push(lines[index])
@@ -185,7 +191,14 @@ export function markdownToEditorData(markdown: string): OutputData {
       }
       if (index < lines.length) index += 1
       blocks.push(
-        createBlock("code", { code: codeLines.join("\n") }, blocks.length),
+        createBlock(
+          "code",
+          {
+            code: codeLines.join("\n"),
+            ...(language ? { language } : {}),
+          },
+          blocks.length,
+        ),
       )
       continue
     }

@@ -4,6 +4,7 @@ import type { OutputData } from "@editorjs/editorjs"
 import { diff_match_patch } from "diff-match-patch"
 import { useMemo } from "react"
 import EditorBlockPreview, {
+  getComparableBlockText,
   getVisibleBlockText,
   type PreviewDiffSegment,
 } from "./EditorBlockPreview"
@@ -116,7 +117,7 @@ function isSameBlockForPreview(
 ) {
   return (
     leftBlock.type === rightBlock.type &&
-    getVisibleBlockText(leftBlock) === getVisibleBlockText(rightBlock) &&
+    getComparableBlockText(leftBlock) === getComparableBlockText(rightBlock) &&
     getColumnLayoutSignature(leftBlock) === getColumnLayoutSignature(rightBlock)
   )
 }
@@ -269,8 +270,9 @@ function ComparePane({
 
             const text = getVisibleBlockText(block)
             const compareText = getVisibleBlockText(compareBlock)
+            const hasVisibleTextDiff = text !== compareText
             const segments =
-              row.status !== "same" && compareBlock
+              row.status !== "same" && compareBlock && hasVisibleTextDiff
                 ? (buildDiffSegments(
                     side === "left" ? text : compareText,
                     side === "left" ? compareText : text,

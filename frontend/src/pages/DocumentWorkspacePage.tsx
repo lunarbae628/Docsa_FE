@@ -2,7 +2,6 @@ import BranchEditModal from "@/components/BranchEditModal"
 import DocumentCompareView from "@/components/DocumentCompareView"
 import DocumentEditor from "@/components/DocumentEditor"
 import DocumentMergeView from "@/components/DocumentMergeView"
-import DocumentSidebarQuickMenu from "@/components/DocumentSidebarQuickMenu"
 import DocumentWorkspaceGraphPanel from "@/components/DocumentWorkspaceGraphPanel"
 import SaveCommitModal from "@/components/SaveCommitModal"
 import {
@@ -472,7 +471,6 @@ export default function DocumentWorkspacePage() {
             <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <DocumentSidebarQuickMenu currentDocumentId={documentId} />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
                       {rightTitle}

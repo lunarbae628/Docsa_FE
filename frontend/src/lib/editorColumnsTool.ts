@@ -1,12 +1,12 @@
-import Code from "@editorjs/code"
 import Delimiter from "@editorjs/delimiter"
 import EditorJS, { type OutputData } from "@editorjs/editorjs"
 import Header from "@editorjs/header"
 import ImageTool from "@editorjs/image"
 import List from "@editorjs/list"
 import Paragraph from "@editorjs/paragraph"
-import Quote from "@editorjs/quote"
+import { CodeWithLanguage } from "./editorCodeTool"
 import { ResizeOnlyImageTune } from "./editorImageTune"
+import { AlignedQuote } from "./editorQuoteTool"
 
 type EditorBlock = OutputData["blocks"][number]
 
@@ -104,7 +104,7 @@ function createNestedTools(
       },
     },
     quote: {
-      class: Quote,
+      class: AlignedQuote,
       inlineToolbar: true,
       config: {
         quotePlaceholder: "인용문을 입력하세요",
@@ -112,7 +112,7 @@ function createNestedTools(
       },
     },
     code: {
-      class: Code,
+      class: CodeWithLanguage,
       config: {
         placeholder: "코드를 입력하세요",
       },
@@ -162,6 +162,7 @@ export class ColumnsTool {
   private leftRatio: number
   private editors: Array<EditorJS | null> = []
   private holders: HTMLElement[] = []
+  private destroyed = false
 
   constructor({ data, config, readOnly = false }: ColumnsToolConstructor) {
     this.data = normalizeColumns(data)
@@ -189,6 +190,7 @@ export class ColumnsTool {
   }
 
   render() {
+    this.destroyed = false
     const wrapper = document.createElement("div")
     wrapper.className = "columns-tool cdx-block"
     this.applyGridRatio(wrapper)
@@ -272,7 +274,7 @@ export class ColumnsTool {
   }
 
   private mountEditors() {
-    if (this.editors.length) {
+    if (this.destroyed || this.editors.length) {
       return
     }
 
@@ -285,7 +287,15 @@ export class ColumnsTool {
         placeholder: this.readOnly ? "" : "내용을 입력하세요...",
         tools: createNestedTools(this.config.uploadImageByFile),
         onChange: async () => {
-          if (this.readOnly) {
+          if (this.readOnly || this.destroyed) {
+            return
+          }
+
+          await editor.isReady
+          if (
+            this.editors[index] !== editor ||
+            typeof editor.save !== "function"
+          ) {
             return
           }
 
@@ -306,7 +316,7 @@ export class ColumnsTool {
       this.data.map(async (column, index) => {
         const editor = this.editors[index]
 
-        if (!editor) {
+        if (!editor || this.destroyed || typeof editor.save !== "function") {
           return column
         }
 
@@ -324,8 +334,13 @@ export class ColumnsTool {
   }
 
   destroy() {
+    this.destroyed = true
     for (const editor of this.editors) {
-      editor?.destroy()
+      try {
+        editor?.destroy()
+      } catch (error) {
+        console.error("Error destroying columns editor:", error)
+      }
     }
     this.editors = []
   }

@@ -7,10 +7,18 @@ import type { EditorBlock } from "@/lib/diffUtils"
 import { cn } from "@/lib/utils"
 import type { OutputData } from "@editorjs/editorjs"
 import { diff_match_patch } from "diff-match-patch"
-import { Check, ChevronsLeft, ChevronsRight, GitMerge, X } from "lucide-react"
+import {
+  Check,
+  ChevronsLeft,
+  ChevronsRight,
+  GitMerge,
+  Maximize2,
+  X,
+} from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import DocumentEditor, { type DocumentEditorRef } from "./DocumentEditor"
 import EditorBlockPreview, {
+  getComparableBlockText,
   getVisibleBlockText,
   type PreviewDiffSegment,
 } from "./EditorBlockPreview"
@@ -30,6 +38,7 @@ interface DocumentMergeViewProps {
 
 type MergeRowStatus = "same" | "modified" | "deleted" | "added"
 type MergeDecision = "left" | "right" | null
+type ExpandedPane = "left" | "result" | "right" | null
 type ResultMarker = {
   id: number
   label: string
@@ -155,7 +164,7 @@ function isSameBlockForPreview(
 ) {
   return (
     leftBlock.type === rightBlock.type &&
-    getVisibleBlockText(leftBlock) === getVisibleBlockText(rightBlock) &&
+    getComparableBlockText(leftBlock) === getComparableBlockText(rightBlock) &&
     getColumnLayoutSignature(leftBlock) === getColumnLayoutSignature(rightBlock)
   )
 }
@@ -258,7 +267,6 @@ function buildMergeRows(
 function buildDiffSegments(leftText: string, rightText: string): DiffSegment[] {
   const dmp = new diff_match_patch()
   const diffs = dmp.diff_main(leftText, rightText)
-  dmp.diff_cleanupSemantic(diffs)
 
   const segments: DiffSegment[] = []
   let pendingLeft = ""
@@ -889,12 +897,14 @@ function buildAllDecisions(rows: MergeRow[], side: "left" | "right") {
 function PaneBlock({
   row,
   side,
+  showDiff,
   decisions,
   onSelectWhole,
   onSelectRegion,
 }: {
   row: MergeRow
   side: "left" | "right"
+  showDiff: boolean
   decisions: Record<string, MergeDecision>
   onSelectWhole: (row: MergeRow, side: "left" | "right") => void
   onSelectRegion: (
@@ -912,11 +922,12 @@ function PaneBlock({
 
   const blockText = getVisibleBlockText(block)
   const compareText = getVisibleBlockText(compareBlock)
+  const hasVisibleTextDiff = blockText !== compareText
   const wholeDecision = decisions[decisionKey(row, null)] ?? null
   const isWholeSelected = wholeDecision === side
 
   const segments =
-    row.status !== "same" && compareBlock
+    showDiff && row.status !== "same" && compareBlock && hasVisibleTextDiff
       ? (buildDiffSegments(
           side === "left" ? blockText : compareText,
           side === "left" ? compareText : blockText,
@@ -926,19 +937,25 @@ function PaneBlock({
   return (
     <EditorBlockPreview
       block={block}
-      compareBlock={compareBlock}
+      compareBlock={showDiff ? compareBlock : undefined}
       side={side}
-      status={row.status}
+      status={showDiff ? row.status : "same"}
       segments={segments}
-      buildSegments={buildDiffSegments}
+      buildSegments={showDiff ? buildDiffSegments : undefined}
       isWholeSelected={isWholeSelected}
       isRegionSelected={(regionIndex) =>
         decisions[decisionKey(row, regionIndex)] === side
       }
       onSelectWhole={
-        row.status !== "same" ? () => onSelectWhole(row, side) : undefined
+        showDiff && row.status !== "same"
+          ? () => onSelectWhole(row, side)
+          : undefined
       }
-      onSelectRegion={(regionIndex) => onSelectRegion(row, side, regionIndex)}
+      onSelectRegion={
+        showDiff
+          ? (regionIndex) => onSelectRegion(row, side, regionIndex)
+          : undefined
+      }
     />
   )
 }
@@ -947,16 +964,20 @@ function PreviewPane({
   label,
   subtitle,
   side,
+  showDiff,
   rows,
   decisions,
+  onExpand,
   onSelectWhole,
   onSelectRegion,
 }: {
   label: string
   subtitle: string
   side: "left" | "right"
+  showDiff: boolean
   rows: MergeRow[]
   decisions: Record<string, MergeDecision>
+  onExpand: () => void
   onSelectWhole: (row: MergeRow, side: "left" | "right") => void
   onSelectRegion: (
     row: MergeRow,
@@ -966,9 +987,21 @@ function PreviewPane({
 }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-col bg-white">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <div className="text-sm font-semibold text-slate-900">{label}</div>
-        <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
+      <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-900">
+            {label}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
+        </div>
+        <button
+          type="button"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+          onClick={onExpand}
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+          크게 보기
+        </button>
       </div>
       <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
         <div className="w-full min-w-0">
@@ -977,6 +1010,7 @@ function PreviewPane({
               <PaneBlock
                 row={row}
                 side={side}
+                showDiff={showDiff}
                 decisions={decisions}
                 onSelectWhole={onSelectWhole}
                 onSelectRegion={onSelectRegion}
@@ -985,6 +1019,29 @@ function PreviewPane({
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ExpandedReadOnlyDocument({
+  rows,
+  side,
+}: {
+  rows: MergeRow[]
+  side: "left" | "right"
+}) {
+  return (
+    <div className="mx-auto w-full max-w-[860px] px-10 py-10">
+      {rows.map((row) => {
+        const block = side === "left" ? row.leftBlock : row.rightBlock
+        if (!block) return <div key={`${side}-${row.key}`} className="h-6" />
+
+        return (
+          <div key={`${side}-${row.key}`} className="py-3">
+            <EditorBlockPreview block={block} side={side} status="same" />
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1017,6 +1074,7 @@ export default function DocumentMergeView({
   )
   const [decisions, setDecisions] = useState<Record<string, MergeDecision>>({})
   const [resultMarker, setResultMarker] = useState<ResultMarker>(null)
+  const [expandedPane, setExpandedPane] = useState<ExpandedPane>(null)
 
   useEffect(() => {
     const nextData = cloneData(baselineData)
@@ -1192,6 +1250,35 @@ export default function DocumentMergeView({
     onSave(latestData)
   }
 
+  const openExpandedPane = async (pane: Exclude<ExpandedPane, null>) => {
+    if (pane === "result") {
+      const latestData = await editorRef.current?.saveData()
+      if (latestData) {
+        setMergedData(latestData)
+      }
+    }
+
+    setExpandedPane(pane)
+  }
+
+  const closeExpandedPane = async () => {
+    if (expandedPane === "result") {
+      const latestData = await editorRef.current?.saveData()
+      if (latestData) {
+        setMergedData(latestData)
+      }
+    }
+
+    setExpandedPane(null)
+  }
+
+  const expandedTitle =
+    expandedPane === "left"
+      ? baseLabel
+      : expandedPane === "right"
+        ? targetLabel
+        : "병합 결과"
+
   return (
     <div
       className={cn("flex h-full min-h-0 min-w-0 flex-col bg-white", className)}
@@ -1208,29 +1295,31 @@ export default function DocumentMergeView({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => applyWholeDocument("left")}
-          >
-            <ChevronsLeft className="h-4 w-4" />
-            왼쪽 모두 반영
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => applyWholeDocument("right")}
-          >
-            오른쪽 모두 반영
-            <ChevronsRight className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-600 transition hover:bg-rose-50 hover:text-rose-700"
+              onClick={() => applyWholeDocument("left")}
+            >
+              <ChevronsLeft className="h-3.5 w-3.5" />
+              왼쪽 전체
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700"
+              onClick={() => applyWholeDocument("right")}
+            >
+              오른쪽 전체
+              <ChevronsRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <Button size="sm" variant="outline" onClick={onCancel}>
             <X className="h-4 w-4" />
-            병합 종료
+            종료
           </Button>
           <Button size="sm" onClick={handleSave}>
             <Check className="h-4 w-4" />
-            병합 적용
+            적용
           </Button>
         </div>
       </div>
@@ -1240,8 +1329,10 @@ export default function DocumentMergeView({
           label={baseLabel}
           subtitle="기존 문서"
           side="left"
+          showDiff
           rows={rows}
           decisions={decisions}
+          onExpand={() => void openExpandedPane("left")}
           onSelectWhole={(row) => void handleWholeToggle(row, "left")}
           onSelectRegion={(row, _side, regionIndex) =>
             void handleRegionToggle(row, "left", regionIndex)
@@ -1249,16 +1340,26 @@ export default function DocumentMergeView({
         />
 
         <div className="min-h-0 min-w-0 border-x border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <div className="text-sm font-semibold text-slate-900">
-              병합 결과
+          <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-900">
+                병합 결과
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                공통 기반 위에 선택한 차이가 반영됩니다.
+              </div>
             </div>
-            <div className="mt-1 text-xs text-slate-500">
-              공통 기반 위에 선택한 차이가 반영됩니다.
-            </div>
+            <button
+              type="button"
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+              onClick={() => void openExpandedPane("result")}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              크게 보기
+            </button>
           </div>
           <div
-            ref={resultEditorShellRef}
+            ref={expandedPane === "result" ? undefined : resultEditorShellRef}
             className="relative h-full min-h-0 overflow-auto"
           >
             {resultMarker ? (
@@ -1302,17 +1403,23 @@ export default function DocumentMergeView({
             ) : null}
             <div className="h-full w-full px-6 py-6">
               <div className="merge-result-editor-frame h-full w-full">
-                <DocumentEditor
-                  ref={editorRef}
-                  key="merge-result-editor"
-                  isEditable={true}
-                  documentId={documentId}
-                  initialData={mergedData}
-                  onDataChange={setMergedData}
-                  disableAutoUpdate={true}
-                  minimalChrome={true}
-                  contentLayout="full"
-                />
+                {expandedPane === "result" ? (
+                  <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm font-medium text-slate-500">
+                    크게 보기에서 병합 결과를 편집 중입니다.
+                  </div>
+                ) : (
+                  <DocumentEditor
+                    ref={editorRef}
+                    key="merge-result-editor"
+                    isEditable={true}
+                    documentId={documentId}
+                    initialData={mergedData}
+                    onDataChange={setMergedData}
+                    disableAutoUpdate={true}
+                    minimalChrome={true}
+                    contentLayout="full"
+                  />
+                )}
               </div>
               <style>{`
                 .merge-result-editor-frame .ce-block__content {
@@ -1333,14 +1440,68 @@ export default function DocumentMergeView({
           label={targetLabel}
           subtitle="변경된 문서"
           side="right"
+          showDiff
           rows={rows}
           decisions={decisions}
+          onExpand={() => void openExpandedPane("right")}
           onSelectWhole={(row) => void handleWholeToggle(row, "right")}
           onSelectRegion={(row, _side, regionIndex) =>
             void handleRegionToggle(row, "right", regionIndex)
           }
         />
       </div>
+      {expandedPane ? (
+        <div className="fixed inset-0 z-[80] bg-slate-950/45 p-5 backdrop-blur-sm">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.35)]">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-950">
+                  {expandedTitle}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {expandedPane === "result"
+                    ? "실제 문서 폭으로 병합 결과를 편집합니다."
+                    : "원본 문서를 실제 문서 폭으로 확인합니다."}
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void closeExpandedPane()}
+              >
+                <X className="h-4 w-4" />
+                닫기
+              </Button>
+            </div>
+
+            <div
+              ref={expandedPane === "result" ? resultEditorShellRef : undefined}
+              className="min-h-0 flex-1 overflow-auto bg-slate-50"
+            >
+              {expandedPane === "left" ? (
+                <ExpandedReadOnlyDocument rows={rows} side="left" />
+              ) : expandedPane === "right" ? (
+                <ExpandedReadOnlyDocument rows={rows} side="right" />
+              ) : (
+                <div className="mx-auto h-full min-h-[860px] w-full max-w-[980px] bg-white px-10 py-10 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+                  <DocumentEditor
+                    ref={editorRef}
+                    key="merge-result-expanded-editor"
+                    isEditable={true}
+                    documentId={documentId}
+                    initialData={mergedData}
+                    onDataChange={setMergedData}
+                    disableAutoUpdate={true}
+                    minimalChrome={true}
+                    contentLayout="document"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

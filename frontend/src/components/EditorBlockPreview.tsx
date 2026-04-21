@@ -1,5 +1,6 @@
 import type { EditorBlock } from "@/lib/diffUtils"
 import { cn } from "@/lib/utils"
+import type { KeyboardEvent } from "react"
 import {
   canRenderInlineDiff,
   getBlockRenderer,
@@ -15,9 +16,11 @@ export type { PreviewDiffSegment, PreviewSide }
 
 interface EditorBlockPreviewProps {
   block?: EditorBlock
+  compareBlock?: EditorBlock
   side: PreviewSide
   status?: PreviewBlockStatus
   segments?: PreviewDiffSegment[]
+  buildSegments?: (leftText: string, rightText: string) => PreviewDiffSegment[]
   isWholeSelected?: boolean
   isRegionSelected?: (regionIndex: number) => boolean
   onSelectWhole?: () => void
@@ -40,11 +43,25 @@ export function getVisibleBlockText(block: EditorBlock | undefined): string {
   return getBlockRenderer(block.type).extractText(getRendererData(block))
 }
 
+function handleKeyboardSelect(
+  event: KeyboardEvent<HTMLDivElement>,
+  onSelect: () => void,
+) {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return
+  }
+
+  event.preventDefault()
+  onSelect()
+}
+
 export default function EditorBlockPreview({
   block,
+  compareBlock,
   side,
   status = "same",
   segments,
+  buildSegments,
   isWholeSelected,
   isRegionSelected,
   onSelectWhole,
@@ -64,6 +81,8 @@ export default function EditorBlockPreview({
       ? renderer.renderWithDiff(rendererData, {
           side,
           segments,
+          compareData: compareBlock ? getRendererData(compareBlock) : undefined,
+          buildSegments,
           isRegionSelected,
           onSelectRegion,
         })
@@ -78,9 +97,12 @@ export default function EditorBlockPreview({
 
   if (onSelectWhole && shouldMarkWholeBlock) {
     return (
-      <button
-        type="button"
+      // biome-ignore lint/a11y/useSemanticElements: Preview content can contain nested editor controls, so button would create invalid nested interactive markup.
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onSelectWhole}
+        onKeyDown={(event) => handleKeyboardSelect(event, onSelectWhole)}
         className={cn(
           "block w-full text-left transition-colors hover:bg-slate-50",
           previewClassName,
@@ -88,7 +110,7 @@ export default function EditorBlockPreview({
         )}
       >
         {blockContent}
-      </button>
+      </div>
     )
   }
 

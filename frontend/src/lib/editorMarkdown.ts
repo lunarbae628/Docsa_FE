@@ -40,6 +40,35 @@ function flattenListItems(items: any[], depth = 0): string[] {
   return lines
 }
 
+function createOutputData(blocks: EditorBlock[]): OutputData {
+  return {
+    time: Date.now(),
+    version: "2.30.8",
+    blocks,
+  }
+}
+
+function columnsToMarkdown(data: Record<string, unknown>) {
+  const columns = Array.isArray(data.columns) ? data.columns.slice(0, 2) : []
+
+  return columns
+    .map((column, index) => {
+      const blocks =
+        column &&
+        typeof column === "object" &&
+        Array.isArray((column as any).blocks)
+          ? ((column as any).blocks as EditorBlock[])
+          : []
+      const content = blocks.length
+        ? editorDataToMarkdown(createOutputData(blocks))
+        : ""
+
+      return [`Column ${index + 1}`, content].filter(Boolean).join("\n")
+    })
+    .filter(Boolean)
+    .join("\n\n")
+}
+
 export function editorDataToMarkdown(data: OutputData): string {
   const sections = data.blocks
     .map((block: EditorBlock) => {
@@ -61,8 +90,7 @@ export function editorDataToMarkdown(data: OutputData): string {
               const indentMatch = item.match(/^(\s*)/)
               const indent = indentMatch?.[1] ?? ""
               const content = item.trim()
-              const marker =
-                style === "ordered" ? `${index + 1}.` : "-"
+              const marker = style === "ordered" ? `${index + 1}.` : "-"
               return `${indent}${marker} ${content}`
             })
             .join("\n")
@@ -81,6 +109,8 @@ export function editorDataToMarkdown(data: OutputData): string {
         }
         case "delimiter":
           return "---"
+        case "columns":
+          return columnsToMarkdown(block.data)
         default: {
           if (block?.data?.text) {
             return escapeMarkdownText(normalizeInlineText(block.data.text))

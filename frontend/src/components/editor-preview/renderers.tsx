@@ -1,5 +1,10 @@
+import {
+  COLUMNS_LAYOUT_REGION_INDEX,
+  VISUAL_BLOCK_REGION_INDEX,
+  columnsRegionIndex,
+} from "@/lib/columnsDiff"
 import { cn } from "@/lib/utils"
-import type { ReactNode } from "react"
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react"
 import {
   buildDiffLines,
   lineText,
@@ -13,10 +18,34 @@ import {
   getListItemText,
   normalizeListStyle,
 } from "./list"
+import { blockTone } from "./styles"
 import { normalizeVisibleText, renderTextWithBreaks } from "./text"
-import type { BlockRenderer, BlockRendererContext } from "./types"
+import type {
+  BlockRenderer,
+  BlockRendererContext,
+  PreviewDiffSegment,
+  PreviewSide,
+} from "./types"
 
 type BlockData = Record<string, unknown>
+type PreviewBlock = {
+  id?: string
+  type?: string
+  data?: BlockData
+  tunes?: Record<string, unknown>
+}
+
+function handleKeyboardSelect(
+  event: KeyboardEvent<HTMLDivElement>,
+  onSelect: () => void,
+) {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return
+  }
+
+  event.preventDefault()
+  onSelect()
+}
 
 function dataText(data: BlockData) {
   return normalizeVisibleText(data.text)
@@ -473,6 +502,395 @@ const imageRenderer: BlockRenderer<BlockData> = {
       </figure>
     )
   },
+  renderWithDiff(data, context) {
+    const compareData = context.compareData
+
+    if (!compareData) {
+      return imageRenderer.render(data)
+    }
+
+    const currentUrl = getImageUrl(data)
+    const compareUrl = getImageUrl(compareData)
+    const currentCaption = getImageCaption(data)
+    const compareCaption = getImageCaption(compareData)
+    const currentWidth = getResizeWidth(data)
+    const compareWidth = getResizeWidth(compareData)
+    const currentFlags = [
+      getImageFlag(data, "stretched"),
+      getImageFlag(data, "withBorder"),
+      getImageFlag(data, "withBackground"),
+    ].join("|")
+    const compareFlags = [
+      getImageFlag(compareData, "stretched"),
+      getImageFlag(compareData, "withBorder"),
+      getImageFlag(compareData, "withBackground"),
+    ].join("|")
+    const selected =
+      context.isRegionSelected?.(VISUAL_BLOCK_REGION_INDEX) ?? false
+    const labels = [
+      currentUrl !== compareUrl ? "이미지 변경" : null,
+      currentWidth !== compareWidth ? "크기 변경" : null,
+      currentCaption !== compareCaption ? "캡션 변경" : null,
+      currentFlags !== compareFlags ? "스타일 변경" : null,
+    ].filter(Boolean)
+    const content = (
+      <div
+        className={cn(
+          "relative rounded-2xl border p-2 transition-colors",
+          blockTone(context.side, selected),
+          context.onSelectRegion ? "cursor-pointer hover:bg-slate-50" : "",
+        )}
+      >
+        {labels.length ? (
+          <div className="absolute right-3 top-3 z-10 flex flex-wrap justify-end gap-1.5">
+            {labels.map((label) => (
+              <span
+                key={label}
+                className="rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {imageRenderer.render(data)}
+      </div>
+    )
+
+    if (!context.onSelectRegion) {
+      return content
+    }
+
+    const handleSelect = () =>
+      context.onSelectRegion?.(VISUAL_BLOCK_REGION_INDEX)
+
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: Preview content can contain nested editor controls, so button would create invalid nested interactive markup.
+      <div
+        role="button"
+        tabIndex={0}
+        className="block w-full text-left"
+        onClick={handleSelect}
+        onKeyDown={(event) => handleKeyboardSelect(event, handleSelect)}
+      >
+        {content}
+      </div>
+    )
+  },
+}
+
+function getColumnBlocks(column: unknown) {
+  if (!column || typeof column !== "object") {
+    return []
+  }
+
+  const blocks = (column as { blocks?: unknown }).blocks
+  return Array.isArray(blocks) ? (blocks as PreviewBlock[]) : []
+}
+
+function getColumns(data: BlockData) {
+  const columns = Array.isArray(data.columns) ? data.columns.slice(0, 2) : []
+
+  while (columns.length < 2) {
+    columns.push({ blocks: [] })
+  }
+
+  return columns
+}
+
+function getColumnsLeftRatio(data: BlockData) {
+  const ratio = Number(data.leftRatio)
+
+  if (!Number.isFinite(ratio)) {
+    return 50
+  }
+
+  return Math.min(72, Math.max(28, ratio))
+}
+
+function getRoundedColumnsLeftRatio(data: BlockData) {
+  return Math.round(getColumnsLeftRatio(data))
+}
+
+function renderNestedBlock(block: PreviewBlock, index: number) {
+  if (!block.type || !block.data) {
+    return null
+  }
+
+  const renderer = getBlockRenderer(block.type)
+  const rendererData = block.tunes
+    ? {
+        ...block.data,
+        __tunes: block.tunes,
+      }
+    : block.data
+
+  return (
+    <div key={block.id ?? `${block.type}-${index}`} className="min-w-0">
+      {renderer.render(rendererData)}
+    </div>
+  )
+}
+
+function blockText(block: PreviewBlock | undefined) {
+  if (!block?.type || !block.data) {
+    return ""
+  }
+
+  const renderer = getBlockRenderer(block.type)
+  const rendererData = block.tunes
+    ? {
+        ...block.data,
+        __tunes: block.tunes,
+      }
+    : block.data
+
+  return renderer.extractText(rendererData)
+}
+
+function renderNestedBlockWithDiff({
+  block,
+  compareBlock,
+  side,
+  columnIndex,
+  blockIndex,
+  context,
+}: {
+  block: PreviewBlock | undefined
+  compareBlock: PreviewBlock | undefined
+  side: PreviewSide
+  columnIndex: number
+  blockIndex: number
+  context: BlockRendererContext
+}) {
+  if (!block?.type || !block.data) {
+    return <div key={`empty-${columnIndex}-${blockIndex}`} className="h-6" />
+  }
+
+  const renderer = getBlockRenderer(block.type)
+  const rendererData = block.tunes
+    ? {
+        ...block.data,
+        __tunes: block.tunes,
+      }
+    : block.data
+  const compareRendererData = compareBlock?.tunes
+    ? {
+        ...compareBlock.data,
+        __tunes: compareBlock.tunes,
+      }
+    : compareBlock?.data
+  const nestedContext = {
+    ...context,
+    compareData: compareRendererData,
+    isRegionSelected: (regionIndex: number) =>
+      context.isRegionSelected?.(
+        columnsRegionIndex(columnIndex, blockIndex, regionIndex),
+      ) ?? false,
+    onSelectRegion: context.onSelectRegion
+      ? (regionIndex: number) =>
+          context.onSelectRegion?.(
+            columnsRegionIndex(columnIndex, blockIndex, regionIndex),
+          )
+      : undefined,
+  }
+  const canInlineDiff = Boolean(
+    compareBlock?.type === block.type &&
+      context.buildSegments &&
+      renderer.renderWithDiff,
+  )
+
+  if (canInlineDiff && compareBlock) {
+    const leftText =
+      side === "left" ? blockText(block) : blockText(compareBlock)
+    const rightText =
+      side === "left" ? blockText(compareBlock) : blockText(block)
+    const segments = context.buildSegments?.(leftText, rightText) ?? []
+
+    return (
+      <div key={block.id ?? `${block.type}-${blockIndex}`} className="min-w-0">
+        {renderer.renderWithDiff?.(rendererData, {
+          ...nestedContext,
+          segments,
+        })}
+      </div>
+    )
+  }
+
+  const regionIndex = VISUAL_BLOCK_REGION_INDEX
+  const selected = nestedContext.isRegionSelected(regionIndex)
+  const content = (
+    <div
+      className={cn(
+        "min-w-0 rounded-2xl border px-3 py-2 transition-colors",
+        blockTone(side, selected),
+        compareBlock ? "border-dashed" : "",
+        nestedContext.onSelectRegion ? "cursor-pointer hover:bg-slate-50" : "",
+      )}
+    >
+      {renderer.render(rendererData)}
+    </div>
+  )
+
+  if (nestedContext.onSelectRegion) {
+    const handleSelect = () => nestedContext.onSelectRegion?.(regionIndex)
+
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: Nested preview content can contain editor controls, so button would create invalid nested interactive markup.
+      <div
+        role="button"
+        key={block.id ?? `${block.type}-${blockIndex}`}
+        tabIndex={0}
+        className="block w-full text-left"
+        onClick={handleSelect}
+        onKeyDown={(event) => handleKeyboardSelect(event, handleSelect)}
+      >
+        {content}
+      </div>
+    )
+  }
+
+  return <div key={block.id ?? `${block.type}-${blockIndex}`}>{content}</div>
+}
+
+const columnsRenderer: BlockRenderer<BlockData> = {
+  extractText(data) {
+    return getColumns(data)
+      .map((column, columnIndex) => {
+        const blocks = getColumnBlocks(column)
+        const text = blocks
+          .map((block) => {
+            if (!block.type || !block.data) {
+              return ""
+            }
+
+            const renderer = getBlockRenderer(block.type)
+            const rendererData = block.tunes
+              ? {
+                  ...block.data,
+                  __tunes: block.tunes,
+                }
+              : block.data
+
+            return renderer.extractText(rendererData)
+          })
+          .filter(Boolean)
+          .join("\n\n")
+
+        return `column:${columnIndex + 1}\n${text}`
+      })
+      .join("\n\n")
+  },
+  render(data) {
+    const leftRatio = getColumnsLeftRatio(data)
+    const columns = getColumns(data)
+
+    return (
+      <div
+        className="columns-tool cdx-block grid w-full min-w-0 grid-cols-[minmax(0,var(--columns-left-size))_1px_minmax(0,var(--columns-right-size))] gap-x-4 overflow-hidden py-2 xl:gap-x-7"
+        style={
+          {
+            "--columns-left-size": `${leftRatio}fr`,
+            "--columns-right-size": `${100 - leftRatio}fr`,
+          } as CSSProperties
+        }
+      >
+        <div className="columns-tool__column min-w-0">
+          {getColumnBlocks(columns[0]).map(renderNestedBlock)}
+        </div>
+        <div className="columns-tool__divider w-px self-stretch bg-slate-200" />
+        <div className="columns-tool__column min-w-0">
+          {getColumnBlocks(columns[1]).map(renderNestedBlock)}
+        </div>
+      </div>
+    )
+  },
+  renderWithDiff(data, context) {
+    if (!context.compareData || !context.buildSegments) {
+      return columnsRenderer.render(data)
+    }
+
+    const leftRatio = getColumnsLeftRatio(data)
+    const compareLeftRatio = getColumnsLeftRatio(context.compareData)
+    const columns = getColumns(data)
+    const compareColumns = getColumns(context.compareData)
+    const layoutChanged = leftRatio !== compareLeftRatio
+    const layoutSelected =
+      context.isRegionSelected?.(COLUMNS_LAYOUT_REGION_INDEX) ?? false
+    const roundedLeftRatio = getRoundedColumnsLeftRatio(data)
+    const layoutLabel = `컬럼 비율 ${roundedLeftRatio}:${100 - roundedLeftRatio}`
+
+    return (
+      <div
+        className={cn(
+          "columns-tool cdx-block relative grid w-full min-w-0 grid-cols-[minmax(0,var(--columns-left-size))_1px_minmax(0,var(--columns-right-size))] gap-x-4 overflow-hidden rounded-2xl py-2 xl:gap-x-7",
+          layoutChanged && "border px-3 pt-10",
+          layoutChanged && blockTone(context.side, layoutSelected),
+        )}
+        style={
+          {
+            "--columns-left-size": `${leftRatio}fr`,
+            "--columns-right-size": `${100 - leftRatio}fr`,
+          } as CSSProperties
+        }
+      >
+        {layoutChanged && context.onSelectRegion ? (
+          // biome-ignore lint/a11y/useSemanticElements: This is inside a complex editor preview surface where button nesting can become invalid.
+          <div
+            role="button"
+            tabIndex={0}
+            className={cn(
+              "absolute left-3 top-3 z-10 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200",
+              context.onSelectRegion ? "cursor-pointer hover:bg-slate-50" : "",
+            )}
+            onClick={() =>
+              context.onSelectRegion?.(COLUMNS_LAYOUT_REGION_INDEX)
+            }
+            onKeyDown={(event) =>
+              handleKeyboardSelect(event, () =>
+                context.onSelectRegion?.(COLUMNS_LAYOUT_REGION_INDEX),
+              )
+            }
+          >
+            {layoutLabel}
+          </div>
+        ) : layoutChanged ? (
+          <div className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200">
+            {layoutLabel}
+          </div>
+        ) : null}
+        {[0, 1].map((columnIndex) => {
+          const blocks = getColumnBlocks(columns[columnIndex])
+          const compareBlocks = getColumnBlocks(compareColumns[columnIndex])
+          const maxLength = Math.max(blocks.length, compareBlocks.length)
+
+          return [
+            columnIndex === 1 ? (
+              <div
+                key={`divider-${columnIndex}`}
+                className="columns-tool__divider w-px self-stretch bg-slate-200"
+              />
+            ) : null,
+            <div
+              key={`column-${columnIndex}`}
+              className="columns-tool__column min-w-0"
+            >
+              {Array.from({ length: maxLength }).map((_, blockIndex) =>
+                renderNestedBlockWithDiff({
+                  block: blocks[blockIndex],
+                  compareBlock: compareBlocks[blockIndex],
+                  side: context.side,
+                  columnIndex,
+                  blockIndex,
+                  context,
+                }),
+              )}
+            </div>,
+          ]
+        })}
+      </div>
+    )
+  },
 }
 
 const fallbackRenderer: BlockRenderer<BlockData> = {
@@ -494,6 +912,7 @@ const rendererRegistry: Record<string, BlockRenderer<BlockData>> = {
   list: listRenderer,
   delimiter: delimiterRenderer,
   image: imageRenderer,
+  columns: columnsRenderer,
 }
 
 export function getBlockRenderer(type: string): BlockRenderer<BlockData> {

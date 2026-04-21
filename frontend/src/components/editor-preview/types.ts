@@ -16,6 +16,8 @@ export type PreviewBlockStatus = "same" | "modified" | "deleted" | "added"
 export interface BlockRendererContext {
   side: PreviewSide
   segments?: PreviewDiffSegment[]
+  compareData?: Record<string, unknown>
+  buildSegments?: (leftText: string, rightText: string) => PreviewDiffSegment[]
   isRegionSelected?: (regionIndex: number) => boolean
   onSelectRegion?: (regionIndex: number) => void
 }

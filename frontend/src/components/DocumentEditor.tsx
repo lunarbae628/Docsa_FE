@@ -1,4 +1,5 @@
 import { apiClient } from "@/api/apiClient"
+import { ColumnsTool } from "@/lib/editorColumnsTool"
 import { ResizeOnlyImageTune } from "@/lib/editorImageTune"
 import {
   editorDataToMarkdown,
@@ -112,20 +113,67 @@ function sanitizeBlockTunes(tunes: unknown) {
 function sanitizeEditorOutputData(data: OutputData): OutputData {
   return {
     ...data,
-    blocks: data.blocks.map((block) => {
-      const blockWithTunes = block as typeof block & {
+    blocks: data.blocks.map((block) => sanitizeEditorBlock(block)),
+  }
+}
+
+function sanitizeEditorBlock(block: OutputData["blocks"][number]) {
+  const sanitizedData =
+    block.type === "columns" ? sanitizeColumnsData(block.data) : block.data
+
+  const nextBlock = {
+    ...block,
+    data: sanitizedData,
+  }
+
+  if (block.type === "columns") {
+    return nextBlock
+  }
+
+  const blockWithTunes = block as typeof block & {
+    tunes?: Record<string, unknown>
+  }
+  const sanitizedTunes = sanitizeBlockTunes(blockWithTunes.tunes)
+
+  if (!sanitizedTunes) {
+    const { tunes: _tunes, ...blockWithoutTunes } =
+      nextBlock as typeof nextBlock & {
         tunes?: Record<string, unknown>
       }
-      const sanitizedTunes = sanitizeBlockTunes(blockWithTunes.tunes)
+    return blockWithoutTunes
+  }
 
-      if (!sanitizedTunes) {
-        const { tunes: _tunes, ...blockWithoutTunes } = blockWithTunes
-        return blockWithoutTunes
-      }
+  return {
+    ...nextBlock,
+    tunes: sanitizedTunes,
+  }
+}
+
+function sanitizeColumnsData(data: Record<string, unknown>) {
+  const columns = Array.isArray(data.columns) ? data.columns : []
+  const leftRatio = Number(data.leftRatio)
+  const sanitizedLeftRatio = Number.isFinite(leftRatio)
+    ? Math.min(72, Math.max(28, leftRatio))
+    : undefined
+  const { leftRatio: _leftRatio, ...restData } = data
+
+  return {
+    ...restData,
+    ...(sanitizedLeftRatio ? { leftRatio: sanitizedLeftRatio } : {}),
+    columns: columns.slice(0, 2).map((column) => {
+      const columnData =
+        column && typeof column === "object"
+          ? (column as { id?: unknown; blocks?: unknown })
+          : {}
+      const blocks = Array.isArray(columnData.blocks)
+        ? columnData.blocks.map((block) =>
+            sanitizeEditorBlock(block as OutputData["blocks"][number]),
+          )
+        : []
 
       return {
-        ...block,
-        tunes: sanitizedTunes,
+        id: typeof columnData.id === "string" ? columnData.id : undefined,
+        blocks,
       }
     }),
   }
@@ -348,6 +396,12 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             class: Code,
             config: {
               placeholder: "코드를 입력하세요",
+            },
+          },
+          columns: {
+            class: ColumnsTool,
+            config: {
+              uploadImageByFile,
             },
           },
           delimiter: Delimiter,
@@ -658,6 +712,108 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             line-height: 1.7;
             padding: 16px 18px;
             box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.75);
+          }
+
+          .document-editor-shell .columns-tool {
+            --columns-divider-color: transparent;
+            --columns-divider-thumb: transparent;
+            display: grid;
+            grid-template-columns:
+              minmax(0, var(--columns-left-size, 1fr))
+              1px
+              minmax(0, var(--columns-right-size, 1fr));
+            column-gap: 28px;
+            align-items: start;
+            margin: 0.75em 0;
+            position: relative;
+            width: 100%;
+          }
+
+          .document-editor-shell .columns-tool:hover,
+          .document-editor-shell .columns-tool:focus-within {
+            --columns-divider-color: #e2e8f0;
+            --columns-divider-thumb: #cbd5e1;
+          }
+
+          .document-editor-shell .columns-tool__column {
+            min-width: 0;
+            min-height: 56px;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            padding: 0;
+          }
+
+          .document-editor-shell .columns-tool__divider {
+            align-self: stretch;
+            min-height: 56px;
+            width: 1px;
+            background: var(--columns-divider-color);
+            cursor: col-resize;
+            position: relative;
+            transition: background-color 140ms ease;
+          }
+
+          .document-editor-shell .columns-tool__divider::before {
+            content: "";
+            position: absolute;
+            inset: 0 -12px;
+          }
+
+          .document-editor-shell .columns-tool__divider::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 28px;
+            border-radius: 999px;
+            background: var(--columns-divider-thumb);
+            transform: translate(-50%, -50%);
+            transition: background-color 140ms ease;
+          }
+
+          .columns-tool-resizing,
+          .columns-tool-resizing * {
+            cursor: col-resize !important;
+            user-select: none !important;
+          }
+
+          .document-editor-shell .columns-tool__column .codex-editor,
+          .document-editor-shell .columns-tool__column .codex-editor__redactor {
+            min-height: 56px !important;
+            height: auto !important;
+            padding-bottom: 0 !important;
+          }
+
+          .document-editor-shell .columns-tool__column .ce-block {
+            margin: 0.25em 0;
+            padding: 0;
+          }
+
+          .document-editor-shell .columns-tool__column .ce-block__content,
+          .document-editor-shell .columns-tool__column .ce-toolbar__content {
+            max-width: none !important;
+            margin: 0 !important;
+          }
+
+          .document-editor-shell .columns-tool__column .ce-toolbar__plus {
+            left: -32px;
+          }
+
+          .document-editor-shell .columns-tool__column .ce-toolbar__settings-btn {
+            left: -4px;
+          }
+
+          @media (max-width: 720px) {
+            .document-editor-shell .columns-tool {
+              grid-template-columns: 1fr;
+              row-gap: 10px;
+            }
+
+            .document-editor-shell .columns-tool__divider {
+              display: none;
+            }
           }
 
           .document-editor-shell .image-tool {

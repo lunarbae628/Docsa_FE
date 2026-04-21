@@ -97,6 +97,30 @@ function pairScore(leftBlock: EditorBlock, rightBlock: EditorBlock) {
   return Number.NEGATIVE_INFINITY
 }
 
+function getColumnLayoutSignature(block: EditorBlock) {
+  if (block.type !== "columns") {
+    return ""
+  }
+
+  const ratio = Number(block.data.leftRatio)
+  const leftRatio = Number.isFinite(ratio)
+    ? Math.min(72, Math.max(28, ratio))
+    : 50
+
+  return `columns:${leftRatio}:${100 - leftRatio}`
+}
+
+function isSameBlockForPreview(
+  leftBlock: EditorBlock,
+  rightBlock: EditorBlock,
+) {
+  return (
+    leftBlock.type === rightBlock.type &&
+    getVisibleBlockText(leftBlock) === getVisibleBlockText(rightBlock) &&
+    getColumnLayoutSignature(leftBlock) === getColumnLayoutSignature(rightBlock)
+  )
+}
+
 function buildRows(leftData: OutputData, rightData: OutputData): CompareRow[] {
   const leftBlocks = (leftData.blocks as EditorBlock[]) ?? []
   const rightBlocks = (rightData.blocks as EditorBlock[]) ?? []
@@ -147,17 +171,13 @@ function buildRows(leftData: OutputData, rightData: OutputData): CompareRow[] {
       match >= deleteLeft &&
       match >= insertRight
     ) {
-      const leftText = getVisibleBlockText(leftBlock)
-      const rightText = getVisibleBlockText(rightBlock)
-
       rows.push({
         key: `pair-${i}-${j}`,
         leftBlock,
         rightBlock,
-        status:
-          leftBlock.type === rightBlock.type && leftText === rightText
-            ? "same"
-            : "modified",
+        status: isSameBlockForPreview(leftBlock, rightBlock)
+          ? "same"
+          : "modified",
       })
       i += 1
       j += 1
@@ -229,15 +249,15 @@ function ComparePane({
   rows: CompareRow[]
 }) {
   return (
-    <div className="flex min-h-0 flex-col bg-white">
+    <div className="flex min-h-0 min-w-0 flex-col bg-white">
       <div className="border-b border-slate-200 px-5 py-4">
         <div className="text-sm font-semibold text-slate-900">{label}</div>
         {subtitle ? (
           <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
         ) : null}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-6">
-        <div className="w-full">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
+        <div className="w-full min-w-0">
           {rows.map((row) => {
             const block = side === "left" ? row.leftBlock : row.rightBlock
             const compareBlock =
@@ -261,9 +281,11 @@ function ComparePane({
               <div key={`${side}-${row.key}`} className="py-4">
                 <EditorBlockPreview
                   block={block}
+                  compareBlock={compareBlock}
                   side={side}
                   status={row.status}
                   segments={segments}
+                  buildSegments={buildDiffSegments}
                 />
               </div>
             )
@@ -291,11 +313,11 @@ export default function DocumentCompareView({
   return (
     <div
       className={cn(
-        "grid h-full min-h-0 grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm",
+        "grid h-full min-h-0 min-w-0 grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm",
         className,
       )}
     >
-      <div className="border-r border-slate-200">
+      <div className="min-w-0 border-r border-slate-200">
         <ComparePane
           label={leftLabel}
           subtitle={leftSubtitle}
@@ -303,7 +325,7 @@ export default function DocumentCompareView({
           rows={rows}
         />
       </div>
-      <div>
+      <div className="min-w-0">
         <ComparePane
           label={rightLabel}
           subtitle={rightSubtitle}

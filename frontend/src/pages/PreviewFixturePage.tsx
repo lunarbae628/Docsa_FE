@@ -3,6 +3,9 @@ import DocumentMergeView from "@/components/DocumentMergeView"
 import type { OutputData } from "@editorjs/editorjs"
 import { useState } from "react"
 
+const previewImageUrl =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='300' viewBox='0 0 420 300'%3E%3Crect width='420' height='300' rx='28' fill='%23f8fafc'/%3E%3Ccircle cx='210' cy='130' r='62' fill='%230f172a'/%3E%3Cpath d='M146 188c32 34 96 34 128 0' fill='none' stroke='%230f172a' stroke-width='16' stroke-linecap='round'/%3E%3Cpath d='M122 88l88-34 88 34-88 34-88-34Z' fill='%230f172a'/%3E%3Cpath d='M154 89l56 22 56-22' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ctext x='210' y='258' text-anchor='middle' font-family='Arial' font-size='28' font-weight='700' fill='%23334155'%3EDocsa%3C/text%3E%3C/svg%3E"
+
 const baseFixture: OutputData = {
   time: 1713070800000,
   version: "2.30.8",
@@ -88,6 +91,81 @@ const baseFixture: OutputData = {
         text: "프리뷰는 입력 가능하지 않아도 사용자가 블록 종류를 바로 식별할 수 있어야 합니다.",
         caption: "미리보기 기준",
         alignment: "left",
+      },
+    },
+    {
+      id: "base-image",
+      type: "image",
+      data: {
+        file: { url: previewImageUrl },
+        caption: "기준 이미지 설명",
+        withBorder: false,
+        withBackground: true,
+        stretched: false,
+      },
+      tunes: {
+        imageResize: {
+          resize: true,
+          resizeSize: 260,
+        },
+      },
+    },
+    {
+      id: "base-columns",
+      type: "columns",
+      data: {
+        leftRatio: 41.16279069767442,
+        columns: [
+          {
+            id: "base-column-left",
+            blocks: [
+              {
+                id: "base-column-left-text",
+                type: "paragraph",
+                data: {
+                  text: "왼쪽 칼럼은 이미지와 함께 배치됩니다.",
+                },
+              },
+              {
+                id: "base-column-left-image",
+                type: "image",
+                data: {
+                  file: { url: previewImageUrl },
+                  caption: "기준 칼럼 이미지",
+                  withBorder: false,
+                  withBackground: false,
+                  stretched: false,
+                },
+                tunes: {
+                  imageResize: {
+                    resize: true,
+                    resizeSize: 190,
+                  },
+                },
+              },
+            ],
+          },
+          {
+            id: "base-column-right",
+            blocks: [
+              {
+                id: "base-column-right-title",
+                type: "header",
+                data: {
+                  text: "오른쪽 칼럼",
+                  level: 4,
+                },
+              },
+              {
+                id: "base-column-right-text",
+                type: "paragraph",
+                data: {
+                  text: "칼럼 비율과 내부 텍스트 diff를 같이 확인합니다.",
+                },
+              },
+            ],
+          },
+        ],
       },
     },
     {
@@ -205,6 +283,81 @@ const targetFixture: OutputData = {
         text: "프리뷰는 입력 가능하지 않아도 사용자가 블록 종류와 변경 위치를 바로 식별할 수 있어야 합니다.",
         caption: "변경된 미리보기 기준",
         alignment: "left",
+      },
+    },
+    {
+      id: "target-image",
+      type: "image",
+      data: {
+        file: { url: previewImageUrl },
+        caption: "변경된 이미지 설명",
+        withBorder: false,
+        withBackground: true,
+        stretched: false,
+      },
+      tunes: {
+        imageResize: {
+          resize: true,
+          resizeSize: 360,
+        },
+      },
+    },
+    {
+      id: "target-columns",
+      type: "columns",
+      data: {
+        leftRatio: 72.28,
+        columns: [
+          {
+            id: "target-column-left",
+            blocks: [
+              {
+                id: "target-column-left-text",
+                type: "paragraph",
+                data: {
+                  text: "왼쪽 칼럼은 이미지와 함께 더 넓게 배치됩니다.",
+                },
+              },
+              {
+                id: "target-column-left-image",
+                type: "image",
+                data: {
+                  file: { url: previewImageUrl },
+                  caption: "변경된 칼럼 이미지",
+                  withBorder: false,
+                  withBackground: false,
+                  stretched: false,
+                },
+                tunes: {
+                  imageResize: {
+                    resize: true,
+                    resizeSize: 250,
+                  },
+                },
+              },
+            ],
+          },
+          {
+            id: "target-column-right",
+            blocks: [
+              {
+                id: "target-column-right-title",
+                type: "header",
+                data: {
+                  text: "오른쪽 칼럼",
+                  level: 4,
+                },
+              },
+              {
+                id: "target-column-right-text",
+                type: "paragraph",
+                data: {
+                  text: "칼럼 비율, 이미지 크기, 내부 텍스트 diff를 같이 확인합니다.",
+                },
+              },
+            ],
+          },
+        ],
       },
     },
     {

@@ -1,3 +1,8 @@
+import {
+  COLUMNS_LAYOUT_REGION_INDEX,
+  VISUAL_BLOCK_REGION_INDEX,
+  columnsRegionIndex,
+} from "@/lib/columnsDiff"
 import type { EditorBlock } from "@/lib/diffUtils"
 import { cn } from "@/lib/utils"
 import type { OutputData } from "@editorjs/editorjs"
@@ -131,6 +136,30 @@ function pairScore(leftBlock: EditorBlock, rightBlock: EditorBlock) {
   return Number.NEGATIVE_INFINITY
 }
 
+function getColumnLayoutSignature(block: EditorBlock) {
+  if (block.type !== "columns") {
+    return ""
+  }
+
+  const ratio = Number(block.data.leftRatio)
+  const leftRatio = Number.isFinite(ratio)
+    ? Math.min(72, Math.max(28, ratio))
+    : 50
+
+  return `columns:${leftRatio}:${100 - leftRatio}`
+}
+
+function isSameBlockForPreview(
+  leftBlock: EditorBlock,
+  rightBlock: EditorBlock,
+) {
+  return (
+    leftBlock.type === rightBlock.type &&
+    getVisibleBlockText(leftBlock) === getVisibleBlockText(rightBlock) &&
+    getColumnLayoutSignature(leftBlock) === getColumnLayoutSignature(rightBlock)
+  )
+}
+
 function buildMergeRows(
   baseData: OutputData,
   targetData: OutputData,
@@ -184,19 +213,15 @@ function buildMergeRows(
       match >= deleteLeft &&
       match >= insertRight
     ) {
-      const leftText = getVisibleBlockText(leftBlock)
-      const rightText = getVisibleBlockText(rightBlock)
-
       rows.push({
         key: `pair-${i}-${j}`,
         leftBlock,
         rightBlock,
         leftIndex: i,
         rightIndex: j,
-        status:
-          leftBlock.type === rightBlock.type && leftText === rightText
-            ? "same"
-            : "modified",
+        status: isSameBlockForPreview(leftBlock, rightBlock)
+          ? "same"
+          : "modified",
       })
       i += 1
       j += 1
@@ -414,6 +439,167 @@ function decisionKey(row: MergeRow, regionIndex: number | null) {
   return `${row.key}:${regionIndex ?? "block"}`
 }
 
+function getColumnBlocks(block: EditorBlock | undefined, columnIndex: number) {
+  const columns = Array.isArray(block?.data.columns)
+    ? block.data.columns.slice(0, 2)
+    : []
+  const column = columns[columnIndex]
+
+  if (!column || typeof column !== "object") {
+    return []
+  }
+
+  const blocks = (column as { blocks?: unknown }).blocks
+  return Array.isArray(blocks) ? (blocks as EditorBlock[]) : []
+}
+
+function getColumnId(block: EditorBlock | undefined, columnIndex: number) {
+  const columns = Array.isArray(block?.data.columns)
+    ? block.data.columns.slice(0, 2)
+    : []
+  const column = columns[columnIndex]
+
+  if (!column || typeof column !== "object") {
+    return undefined
+  }
+
+  const id = (column as { id?: unknown }).id
+  return typeof id === "string" ? id : undefined
+}
+
+function buildMergedEditableBlock(
+  row: MergeRow,
+  leftBlock: EditorBlock,
+  rightBlock: EditorBlock,
+  decisions: Record<string, MergeDecision>,
+  mapRegionIndex = (regionIndex: number) => regionIndex,
+) {
+  const leftText = getVisibleBlockText(leftBlock)
+  const rightText = getVisibleBlockText(rightBlock)
+  const segments = buildDiffSegments(leftText, rightText)
+  const nextText = segments
+    .map((segment) => {
+      if (segment.type === "equal") return segment.text
+
+      const decision =
+        decisions[decisionKey(row, mapRegionIndex(segment.regionIndex))]
+      if (decision === "left") return segment.leftText
+      if (decision === "right") return segment.rightText
+
+      return ""
+    })
+    .join("")
+
+  if (!nextText.replace(/\s+/g, "")) {
+    return null
+  }
+
+  return setBlockText(rightBlock, nextText)
+}
+
+function buildMergedVisualBlock(
+  row: MergeRow,
+  leftBlock: EditorBlock | undefined,
+  rightBlock: EditorBlock | undefined,
+  decisions: Record<string, MergeDecision>,
+  regionIndex: number,
+) {
+  const decision = decisions[decisionKey(row, regionIndex)]
+
+  if (decision === "left" && leftBlock) return cloneData(leftBlock)
+  if (decision === "right" && rightBlock) return cloneData(rightBlock)
+
+  if (
+    leftBlock &&
+    rightBlock &&
+    leftBlock.type === rightBlock.type &&
+    getVisibleBlockText(leftBlock) === getVisibleBlockText(rightBlock)
+  ) {
+    return cloneData(rightBlock)
+  }
+
+  return null
+}
+
+function buildMergedColumnsBlock(
+  row: MergeRow,
+  decisions: Record<string, MergeDecision>,
+) {
+  if (!row.leftBlock || !row.rightBlock) {
+    return null
+  }
+
+  const nextBlock = cloneData(row.rightBlock)
+  const layoutDecision =
+    decisions[decisionKey(row, COLUMNS_LAYOUT_REGION_INDEX)]
+
+  if (layoutDecision === "left" && row.leftBlock) {
+    nextBlock.data.leftRatio = row.leftBlock.data.leftRatio
+  } else if (layoutDecision === "right" && row.rightBlock) {
+    nextBlock.data.leftRatio = row.rightBlock.data.leftRatio
+  }
+
+  nextBlock.data.columns = [0, 1].map((columnIndex) => {
+    const leftBlocks = getColumnBlocks(row.leftBlock, columnIndex)
+    const rightBlocks = getColumnBlocks(row.rightBlock, columnIndex)
+    const maxLength = Math.max(leftBlocks.length, rightBlocks.length)
+    const blocks: EditorBlock[] = []
+
+    for (let blockIndex = 0; blockIndex < maxLength; blockIndex += 1) {
+      const leftBlock = leftBlocks[blockIndex]
+      const rightBlock = rightBlocks[blockIndex]
+      const visualRegionIndex = columnsRegionIndex(
+        columnIndex,
+        blockIndex,
+        VISUAL_BLOCK_REGION_INDEX,
+      )
+
+      if (
+        leftBlock &&
+        rightBlock &&
+        leftBlock.type === rightBlock.type &&
+        isEditableTextBlock(leftBlock) &&
+        isEditableTextBlock(rightBlock)
+      ) {
+        const mergedBlock = buildMergedEditableBlock(
+          row,
+          leftBlock,
+          rightBlock,
+          decisions,
+          (regionIndex) =>
+            columnsRegionIndex(columnIndex, blockIndex, regionIndex),
+        )
+
+        if (mergedBlock) {
+          blocks.push(mergedBlock)
+        }
+        continue
+      }
+
+      const mergedVisualBlock = buildMergedVisualBlock(
+        row,
+        leftBlock,
+        rightBlock,
+        decisions,
+        visualRegionIndex,
+      )
+
+      if (mergedVisualBlock) {
+        blocks.push(mergedVisualBlock)
+      }
+    }
+
+    return {
+      id:
+        getColumnId(row.rightBlock, columnIndex) ??
+        getColumnId(row.leftBlock, columnIndex),
+      blocks,
+    }
+  })
+
+  return nextBlock
+}
+
 function buildCommonBlock(
   row: MergeRow,
   decisions: Record<string, MergeDecision>,
@@ -428,6 +614,28 @@ function buildCommonBlock(
   if (wholeDecision === "right" && row.rightBlock)
     return cloneData(row.rightBlock)
 
+  if (row.leftBlock?.type === "columns" && row.rightBlock?.type === "columns") {
+    return buildMergedColumnsBlock(row, decisions)
+  }
+
+  if (
+    row.leftBlock &&
+    row.rightBlock &&
+    row.leftBlock.type === row.rightBlock.type
+  ) {
+    const mergedVisualBlock = buildMergedVisualBlock(
+      row,
+      row.leftBlock,
+      row.rightBlock,
+      decisions,
+      VISUAL_BLOCK_REGION_INDEX,
+    )
+
+    if (mergedVisualBlock) {
+      return mergedVisualBlock
+    }
+  }
+
   if (
     !row.leftBlock ||
     !row.rightBlock ||
@@ -437,26 +645,7 @@ function buildCommonBlock(
     return null
   }
 
-  const leftText = getVisibleBlockText(row.leftBlock)
-  const rightText = getVisibleBlockText(row.rightBlock)
-  const segments = buildDiffSegments(leftText, rightText)
-  const nextText = segments
-    .map((segment) => {
-      if (segment.type === "equal") return segment.text
-
-      const decision = decisions[decisionKey(row, segment.regionIndex)]
-      if (decision === "left") return segment.leftText
-      if (decision === "right") return segment.rightText
-
-      return ""
-    })
-    .join("")
-
-  if (!nextText.replace(/\s+/g, "")) {
-    return null
-  }
-
-  return setBlockText(row.rightBlock, nextText)
+  return buildMergedEditableBlock(row, row.leftBlock, row.rightBlock, decisions)
 }
 
 function buildMergedDataFromDecisions(
@@ -737,9 +926,11 @@ function PaneBlock({
   return (
     <EditorBlockPreview
       block={block}
+      compareBlock={compareBlock}
       side={side}
       status={row.status}
       segments={segments}
+      buildSegments={buildDiffSegments}
       isWholeSelected={isWholeSelected}
       isRegionSelected={(regionIndex) =>
         decisions[decisionKey(row, regionIndex)] === side
@@ -774,13 +965,13 @@ function PreviewPane({
   ) => void
 }) {
   return (
-    <div className="flex min-h-0 flex-col bg-white">
+    <div className="flex min-h-0 min-w-0 flex-col bg-white">
       <div className="border-b border-slate-200 px-5 py-4">
         <div className="text-sm font-semibold text-slate-900">{label}</div>
         <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-6">
-        <div className="w-full">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
+        <div className="w-full min-w-0">
           {rows.map((row) => (
             <div key={`${side}-${row.key}`} className="py-4">
               <PaneBlock
@@ -1002,7 +1193,9 @@ export default function DocumentMergeView({
   }
 
   return (
-    <div className={cn("flex h-full min-h-0 flex-col bg-white", className)}>
+    <div
+      className={cn("flex h-full min-h-0 min-w-0 flex-col bg-white", className)}
+    >
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
@@ -1042,7 +1235,7 @@ export default function DocumentMergeView({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)_minmax(0,1fr)]">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)_minmax(0,1fr)]">
         <PreviewPane
           label={baseLabel}
           subtitle="기존 문서"
@@ -1055,7 +1248,7 @@ export default function DocumentMergeView({
           }
         />
 
-        <div className="min-h-0 border-x border-slate-200 bg-white">
+        <div className="min-h-0 min-w-0 border-x border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-5 py-4">
             <div className="text-sm font-semibold text-slate-900">
               병합 결과

@@ -44,7 +44,7 @@ export function useDocumentWorkspaceReviewState({
         id: commit.id,
         branchId: commit.branchId,
         title: commit.title,
-        subtitle: branch ? `${branch.name} 기록` : "기록",
+        subtitle: branch ? `${branch.name} 브랜치 기록` : "브랜치 기록",
         blocks: commit.blocks,
       }
     }
@@ -57,7 +57,7 @@ export function useDocumentWorkspaceReviewState({
       id: workspace.id,
       branchId: workspace.branchId,
       title: branch ? `${branch.name} 워크스페이스` : "워크스페이스",
-      subtitle: "편집 상태",
+      subtitle: "브랜치 작업 중",
       blocks: workspace.blocks,
     }
   }, [branches, commits, view, workspaces])
@@ -73,7 +73,7 @@ export function useDocumentWorkspaceReviewState({
         id: commit.id,
         branchId: commit.branchId,
         title: commit.title,
-        subtitle: branch ? `${branch.name} 기록` : "기록",
+        subtitle: branch ? `${branch.name} 브랜치 기록` : "브랜치 기록",
         blocks: commit.blocks,
       }
     }
@@ -86,7 +86,7 @@ export function useDocumentWorkspaceReviewState({
       id: workspace.id,
       branchId: workspace.branchId,
       title: branch ? `${branch.name} 워크스페이스` : "워크스페이스",
-      subtitle: "편집 상태",
+      subtitle: "브랜치 작업 중",
       blocks: workspace.blocks,
     }
   }, [branches, commits, view, workspaces])
@@ -102,7 +102,7 @@ export function useDocumentWorkspaceReviewState({
         id: commit.id,
         branchId: commit.branchId,
         title: commit.title,
-        subtitle: branch ? `${branch.name} 기록` : "기록",
+        subtitle: branch ? `${branch.name} 브랜치 기록` : "브랜치 기록",
         blocks: commit.blocks,
       }
     }
@@ -115,7 +115,7 @@ export function useDocumentWorkspaceReviewState({
       id: workspace.id,
       branchId: workspace.branchId,
       title: branch ? `${branch.name} 워크스페이스` : "워크스페이스",
-      subtitle: "편집 상태",
+      subtitle: "브랜치 작업 중",
       blocks: workspace.blocks,
     }
   }, [branches, commits, view, workspaces])
@@ -131,7 +131,7 @@ export function useDocumentWorkspaceReviewState({
         id: commit.id,
         branchId: commit.branchId,
         title: commit.title,
-        subtitle: branch ? `${branch.name} 기록` : "기록",
+        subtitle: branch ? `${branch.name} 브랜치 기록` : "브랜치 기록",
         blocks: commit.blocks,
       }
     }
@@ -144,7 +144,7 @@ export function useDocumentWorkspaceReviewState({
       id: workspace.id,
       branchId: workspace.branchId,
       title: branch ? `${branch.name} 워크스페이스` : "워크스페이스",
-      subtitle: "편집 상태",
+      subtitle: "브랜치 작업 중",
       blocks: workspace.blocks,
     }
   }, [branches, commits, view, workspaces])

@@ -24,7 +24,7 @@ export default function BranchEditModal({
   isLastCommit = false,
   defaultBranchName = "",
   title,
-  submitLabel = "생성하기",
+  submitLabel = "브랜치 만들기",
   lockNameEdit = false,
 }: BranchEditModalProps) {
   const [branchName, setBranchName] = useState("")
@@ -55,25 +55,25 @@ export default function BranchEditModal({
           <DialogTitle>
             {title ??
               (isLastCommit
-                ? "이 버전에서 계속 작업하기"
-                : "새 버전으로 이어서 작업하기")}
+                ? "현재 브랜치 열기"
+                : "새 브랜치 만들기")}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="branchName">버전 이름 *</Label>
+            <Label htmlFor="branchName">브랜치 이름 *</Label>
             <Input
               id="branchName"
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
-              placeholder="버전 이름을 입력하세요"
+              placeholder="브랜치 이름을 입력하세요"
               required
               disabled={isLoading || lockNameEdit}
               autoFocus
             />
             {lockNameEdit && (
               <p className="text-sm text-gray-500">
-                현재 버전의 마지막 기록이므로 기존 버전에서 계속 작업합니다.
+                현재 브랜치의 마지막 기록이라 기존 브랜치를 바로 엽니다.
               </p>
             )}
           </div>

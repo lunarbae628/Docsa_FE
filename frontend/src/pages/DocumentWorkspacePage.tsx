@@ -28,13 +28,13 @@ import type { GraphDataType } from "@/types/graph"
 import {
   CircleCheck,
   CloudOff,
+  GitBranch,
   GitCommitHorizontal,
   GitCompareArrows,
   GitMerge,
   Loader2,
   PanelLeftClose,
   PanelLeftOpen,
-  Play,
   Trash2,
   X,
 } from "lucide-react"
@@ -299,9 +299,9 @@ export default function DocumentWorkspacePage() {
     view.mode === "workspace"
       ? `${currentBranch?.name ?? "branch"} 워크스페이스`
       : view.mode === "compare"
-        ? "기록 비교"
+        ? "브랜치 비교"
         : view.mode === "merge"
-          ? "기록 병합"
+          ? "브랜치 병합"
           : `${currentBranch?.name ?? "branch"} 기록`
 
   const isCurrentWorkspaceContentReady =
@@ -557,7 +557,7 @@ export default function DocumentWorkspacePage() {
                           handleContinueEditClick(currentCommit.id)
                         }
                       >
-                        <Play className="h-4 w-4" /> 이어서 작업하기
+                        <GitBranch className="h-4 w-4" /> 새 브랜치 만들기
                       </Button>
                       {canDeleteCurrentCommit ? (
                         <Button
@@ -676,10 +676,10 @@ export default function DocumentWorkspacePage() {
                       <DocumentMergeView
                         baseData={mergeSourceData}
                         targetData={mergeTargetData}
-                        baseLabel={mergeSourceItem?.title ?? "병합 원본"}
-                        targetLabel={mergeTargetItem?.title ?? "병합 대상"}
+                        baseLabel={mergeSourceItem?.title ?? "기준 브랜치"}
+                        targetLabel={mergeTargetItem?.title ?? "병합할 브랜치"}
                         documentId={documentId}
-                        title="기록 병합"
+                        title="브랜치 병합"
                         className="h-full"
                         onCancel={() =>
                           mergeSourceItem?.kind === "commit"
@@ -697,10 +697,10 @@ export default function DocumentWorkspacePage() {
                       <div className="min-h-0 border-r border-slate-200 bg-white px-5 py-4">
                         <div className="mb-3">
                           <p className="text-sm font-semibold text-slate-900">
-                            {mergeSourceItem?.title ?? "병합 원본"}
+                            {mergeSourceItem?.title ?? "기준 브랜치"}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            그래프에서 병합 대상을 선택하세요.
+                            그래프에서 병합할 브랜치를 선택하세요.
                           </p>
                         </div>
                         <div className="h-full min-h-[680px]">
@@ -718,10 +718,11 @@ export default function DocumentWorkspacePage() {
                       </div>
                       <div className="flex min-h-0 flex-col justify-center bg-slate-50 px-8 py-6">
                         <p className="text-sm font-semibold text-slate-900">
-                          병합할 대상을 선택하세요
+                          병합할 브랜치를 선택하세요
                         </p>
                         <p className="mt-2 text-sm leading-6 text-slate-500">
-                          그래프에서 다른 기록이나 워크스페이스를 선택하세요.
+                          그래프에서 다른 브랜치 기록이나 워크스페이스를
+                          선택하세요.
                         </p>
                       </div>
                     </div>
@@ -730,8 +731,8 @@ export default function DocumentWorkspacePage() {
                       <DocumentPendingCanvas
                         label={
                           view.targetId
-                            ? "병합 대상 준비 중"
-                            : "병합 기준 준비 중"
+                            ? "병합 브랜치 준비 중"
+                            : "기준 브랜치 준비 중"
                         }
                         visible={showReviewContentPending}
                         compact
@@ -758,10 +759,10 @@ export default function DocumentWorkspacePage() {
                     <div className="min-h-0 border-r border-slate-200 bg-white px-5 py-4">
                       <div className="mb-3">
                         <p className="text-sm font-semibold text-slate-900">
-                          {compareBaseItem?.title ?? "비교 기준"}
+                          {compareBaseItem?.title ?? "기준 브랜치"}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          그래프에서 비교 대상을 선택하세요.
+                          그래프에서 비교할 브랜치를 선택하세요.
                         </p>
                       </div>
                       <div className="h-full min-h-[680px]">
@@ -777,10 +778,11 @@ export default function DocumentWorkspacePage() {
                     </div>
                     <div className="flex min-h-0 flex-col justify-center bg-slate-50 px-8 py-6">
                       <p className="text-sm font-semibold text-slate-900">
-                        비교 대상을 선택하세요
+                        비교할 브랜치를 선택하세요
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-500">
-                        그래프에서 다른 기록이나 워크스페이스를 선택하세요.
+                        그래프에서 다른 브랜치 기록이나 워크스페이스를
+                        선택하세요.
                       </p>
                     </div>
                   </div>
@@ -789,8 +791,8 @@ export default function DocumentWorkspacePage() {
                     <DocumentPendingCanvas
                       label={
                         view.mode === "compare" && view.compareId
-                          ? "비교 대상 준비 중"
-                          : "비교 기준 준비 중"
+                          ? "비교 브랜치 준비 중"
+                          : "기준 브랜치 준비 중"
                       }
                       visible={showReviewContentPending}
                       compact
@@ -825,8 +827,8 @@ export default function DocumentWorkspacePage() {
         onConfirm={handleMergeBranchConfirm}
         isLoading={isActionPending}
         defaultBranchName={mergeBranchState?.suggestedName || ""}
-        title="병합 결과를 저장할 브랜치 이름"
-        submitLabel="병합 워크스페이스 만들기"
+        title="병합 브랜치 이름"
+        submitLabel="병합 브랜치 만들기"
       />
 
       <AlertDialog

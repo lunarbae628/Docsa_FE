@@ -1,6 +1,7 @@
 import { apiClient } from "@/api/apiClient"
 import type { CommitNodeMenuType } from "@/components/CommitNode"
 import type { TempNodeMenuType } from "@/components/TempNode"
+import { useDialog } from "@/components/ui/alert-dialog"
 import type {
   BranchRecord,
   CommitRecord,
@@ -325,6 +326,7 @@ export function useDocumentWorkspaceActions({
   openWorkspaceByBranch,
   openCommit,
 }: UseDocumentWorkspaceActionsParams) {
+  const { showAlertDialog } = useDialog()
   const queryClient = useQueryClient()
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced")
   const [toast, setToast] = useState("")
@@ -582,10 +584,10 @@ export function useDocumentWorkspaceActions({
         })
         await refreshDocumentState(nextParams, false)
         setSearchParams(nextParams, { replace: true })
-        setToast("워크스페이스 열림")
+        setToast("새 브랜치 열림")
       } catch (error: any) {
         await alertDialog(
-          await getApiErrorMessage(error, "이어서 작업하기에 실패했습니다."),
+          await getApiErrorMessage(error, "브랜치 생성에 실패했습니다."),
           "오류",
           "destructive",
         )
@@ -614,7 +616,7 @@ export function useDocumentWorkspaceActions({
         compareKind: null,
         compareId: null,
       })
-      setToast("비교 대상 선택")
+      setToast("비교할 브랜치 선택")
     },
     [setView],
   )
@@ -634,7 +636,7 @@ export function useDocumentWorkspaceActions({
           compareId: id,
         }
       })
-      setToast("비교 중")
+      setToast("브랜치 비교 중")
     },
     [setView],
   )
@@ -649,7 +651,7 @@ export function useDocumentWorkspaceActions({
         targetKind: null,
         targetId: null,
       })
-      setToast("병합 대상 선택")
+      setToast("병합할 브랜치 선택")
     },
     [setView],
   )
@@ -658,7 +660,7 @@ export function useDocumentWorkspaceActions({
     (kind: CompareItemKind, id: number) => {
       if (kind === "workspace") {
         void alertDialog(
-          "워크스페이스는 기록으로 남긴 뒤 병합할 수 있습니다.",
+          "워크스페이스는 기록으로 남긴 뒤 브랜치 병합할 수 있습니다.",
           "선택 불가",
         )
         return
@@ -677,7 +679,7 @@ export function useDocumentWorkspaceActions({
           targetId: id,
         }
       })
-      setToast("병합 미리보기")
+      setToast("브랜치 병합 미리보기")
     },
     [setView],
   )
@@ -791,7 +793,7 @@ export function useDocumentWorkspaceActions({
         })
         setToast("브랜치 삭제됨")
       } catch (error: any) {
-        await alertDialog(
+        await showAlertDialog(
           await getApiErrorMessage(error, "브랜치 삭제에 실패했습니다."),
           "오류",
           "destructive",
@@ -814,6 +816,7 @@ export function useDocumentWorkspaceActions({
       queryClient,
       updateGraphData,
       workspaces,
+      showAlertDialog,
     ],
   )
 
@@ -884,7 +887,7 @@ export function useDocumentWorkspaceActions({
         })
         await refreshDocumentState(nextParams, false)
         setSearchParams(nextParams, { replace: true })
-        setToast("병합 워크스페이스 생성됨")
+        setToast("병합 브랜치 생성됨")
         setMergeBranchState(null)
       } catch (error: any) {
         await alertDialog(

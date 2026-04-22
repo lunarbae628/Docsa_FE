@@ -320,14 +320,14 @@ export default function LandingConceptDemoPage() {
                 '"SF Pro Display","SUIT Variable","Pretendard Variable","Apple SD Gothic Neo",sans-serif',
             }}
           >
-            버전 관리의 악몽, <br />
+            브랜치 관리의 악몽, <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-pink-500 to-orange-600 drop-shadow-[0_10px_30px_rgba(249,115,22,0.4)]">
               이제 끝내다.
             </span>
           </h1>
           <p className="mx-auto mb-16 max-w-3xl text-xl font-light leading-relaxed text-gray-400 md:text-2xl">
             더 이상 파일 이름 뒤에 '진짜최종'을 붙이지 마세요. <br />
-            Docsa는 초안, 기록, 분기, 병합까지 문서의 흐름을 한눈에 정리합니다.
+            Docsa는 초안, 기록, 브랜치, 병합까지 문서의 흐름을 한눈에 정리합니다.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <button
@@ -390,8 +390,8 @@ export default function LandingConceptDemoPage() {
           color="#ec4899"
           side="right"
           subtitle="BRANCH — SAFE DRAFT"
-          title="무한한 버전생성"
-          desc="하나의 원본 기록에서 분기를 분리하여 여러 맥락의 버전을 만들어 관리할 수 있습니다. 메인 문서는 그대로 보존하고 수정안을 안전하게 이어갈 수 있습니다."
+          title="유연한 브랜치 생성"
+          desc="하나의 원본 기록에서 브랜치를 분리해 여러 작업 흐름을 안전하게 이어갈 수 있습니다. 메인 문서는 그대로 두고 수정안을 분리해서 관리할 수 있습니다."
           scrollYProgress={scrollYProgress}
         />
 
@@ -445,7 +445,7 @@ export default function LandingConceptDemoPage() {
       </section>
 
       <footer className="bg-[#050505] py-12 text-center text-sm text-white/35">
-        <p>Docsa, 문서 버전의 흐름을 정리합니다.</p>
+        <p>Docsa, 문서 브랜치의 흐름을 정리합니다.</p>
       </footer>
     </div>
   );

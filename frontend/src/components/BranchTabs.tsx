@@ -1,6 +1,3 @@
-import { useEffect, useMemo, useState, type MouseEvent } from "react"
-import { ChevronDown, GitBranch, PencilLine, X } from "lucide-react"
-import { getBranchColor } from "@/lib/graphUtils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,15 +10,23 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { getBranchColor } from "@/lib/graphUtils"
 import type { Branch, Commit } from "@/types/graph"
+import { ChevronDown, GitBranch, PencilLine, Trash2 } from "lucide-react"
+import { type MouseEvent, useEffect, useMemo, useState } from "react"
 
 interface BranchTabsProps {
   branches: Branch[]
@@ -57,11 +62,15 @@ export default function BranchTabs({
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameValue, setRenameValue] = useState("")
   const [isRenaming, setIsRenaming] = useState(false)
-  const [renameTargetBranch, setRenameTargetBranch] = useState<Branch | null>(null)
+  const [renameTargetBranch, setRenameTargetBranch] = useState<Branch | null>(
+    null,
+  )
 
   const currentBranch = useMemo(
     () =>
-      branches.find((branch) => branch.id === currentBranchId) ?? branches[0] ?? null,
+      branches.find((branch) => branch.id === currentBranchId) ??
+      branches[0] ??
+      null,
     [branches, currentBranchId],
   )
 
@@ -237,7 +246,7 @@ export default function BranchTabs({
                           }}
                           title={`${branch.name} 삭제`}
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </DropdownMenuItem>
@@ -310,11 +319,11 @@ export default function BranchTabs({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <GitBranch className="h-5 w-5 text-red-600" />
-              버전 삭제 확인
+              브랜치 삭제 확인
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <div>
-                <strong>'{deleteDialog.branch?.name}'</strong> 버전을
+                <strong>'{deleteDialog.branch?.name}'</strong> 브랜치를
                 삭제하시겠습니까?
               </div>
 
@@ -342,8 +351,8 @@ export default function BranchTabs({
                     <div>
                       <div className="font-medium">주의!</div>
                       <div className="text-sm">
-                        이 버전은 아직 병합되지 않았습니다. 삭제하면 작업 내용이
-                        영구적으로 손실될 수 있습니다.
+                        이 브랜치는 아직 병합되지 않았습니다. 삭제하면 작업
+                        내용이 영구적으로 손실될 수 있습니다.
                       </div>
                     </div>
                   </div>

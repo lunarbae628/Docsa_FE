@@ -1051,9 +1051,9 @@ export default function DocumentMergeView({
   targetData,
   onSave,
   onCancel,
-  title = "기록 병합",
-  baseLabel = "병합 원본",
-  targetLabel = "병합 대상",
+  title = "브랜치 병합",
+  baseLabel = "기준 브랜치",
+  targetLabel = "병합할 브랜치",
   documentId,
   className,
 }: DocumentMergeViewProps) {

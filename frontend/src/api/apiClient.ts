@@ -5,36 +5,19 @@ import {
   CommitAPIApi,
   Configuration,
   DocumentAPIApi,
+  ImageAPIApi,
   MergeAPIApi,
+  ResponseError,
   SaveAPIApi,
   UserAPIApi,
 } from "./__generated__"
+import type {
+  ImageUploadCompleteResponse,
+  ImageUploadUrlRequest,
+  ImageUploadUrlResponse,
+} from "./__generated__"
 
 export const BACKEND_API = import.meta.env.VITE_BACKEND_API
-
-export interface ImageUploadUrlRequest {
-  docId: number
-  originalFileName: string
-  contentType: string
-  size: number
-}
-
-export interface ImageUploadUrlResponse {
-  imageId: number
-  objectKey: string
-  uploadUrl: string
-  method: string
-  expiresInSeconds: number
-}
-
-export interface ImageUploadCompleteResponse {
-  imageId: number
-  objectKey: string
-  imageUrl: string
-  contentType: string
-  size: number
-  status: "PENDING" | "ACTIVE" | "FAILED"
-}
 
 const apiBasePath = (BACKEND_API || BASE_PATH).replace(/\/+$/, "")
 
@@ -63,37 +46,73 @@ async function parseApiError(response: Response, fallback: string) {
   }
 }
 
-async function fetchBackendJson<T>(
-  path: string,
-  init: RequestInit,
+async function toReadableApiError(
+  error: unknown,
   fallbackErrorMessage: string,
-): Promise<T> {
-  const response = await fetch(`${apiBasePath}${path}`, {
-    credentials: "include",
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error(await parseApiError(response, fallbackErrorMessage))
+): Promise<Error> {
+  if (error instanceof ResponseError) {
+    return new Error(await parseApiError(error.response, fallbackErrorMessage))
   }
 
-  return response.json() as Promise<T>
+  if (error instanceof Error && error.message.trim()) {
+    return error
+  }
+
+  return new Error(fallbackErrorMessage)
+}
+
+function assertUploadUrlResponse(
+  response: ImageUploadUrlResponse,
+): asserts response is ImageUploadUrlResponse & {
+  imageId: number
+  objectKey: string
+  uploadUrl: string
+  method: string
+} {
+  if (
+    typeof response.imageId !== "number" ||
+    typeof response.objectKey !== "string" ||
+    typeof response.uploadUrl !== "string" ||
+    typeof response.method !== "string"
+  ) {
+    throw new Error("이미지 업로드 응답이 올바르지 않습니다.")
+  }
+}
+
+function assertUploadCompleteResponse(
+  response: ImageUploadCompleteResponse,
+): asserts response is ImageUploadCompleteResponse & {
+  imageId: number
+  objectKey: string
+  imageUrl: string
+  contentType: string
+  size: number
+} {
+  if (
+    typeof response.imageId !== "number" ||
+    typeof response.objectKey !== "string" ||
+    typeof response.imageUrl !== "string" ||
+    typeof response.contentType !== "string" ||
+    typeof response.size !== "number"
+  ) {
+    throw new Error("이미지 업로드 완료 응답이 올바르지 않습니다.")
+  }
 }
 
 const imageApi = {
-  createUploadUrl(request: ImageUploadUrlRequest) {
-    return fetchBackendJson<ImageUploadUrlResponse>(
-      "/api/images/upload-url",
-      {
-        method: "POST",
-        body: JSON.stringify(request),
-      },
-      "이미지 업로드 URL 생성에 실패했습니다.",
-    )
+  async createUploadUrl(request: ImageUploadUrlRequest) {
+    try {
+      const response = await generatedImageApi.createUploadUrl({
+        imageUploadUrlRequest: request,
+      })
+      assertUploadUrlResponse(response)
+      return response
+    } catch (error) {
+      throw await toReadableApiError(
+        error,
+        "이미지 업로드 URL 생성에 실패했습니다.",
+      )
+    }
   },
   async uploadToPresignedUrl(uploadUrl: string, file: File, method = "PUT") {
     const response = await fetch(uploadUrl, {
@@ -109,14 +128,19 @@ const imageApi = {
       throw new Error("이미지 파일 업로드에 실패했습니다.")
     }
   },
-  completeUpload(imageId: number) {
-    return fetchBackendJson<ImageUploadCompleteResponse>(
-      `/api/images/${imageId}/complete`,
-      {
-        method: "POST",
-      },
-      "이미지 업로드 완료 처리에 실패했습니다.",
-    )
+  async completeUpload(imageId: number) {
+    try {
+      const response = await generatedImageApi.complete({
+        imageId,
+      })
+      assertUploadCompleteResponse(response)
+      return response
+    } catch (error) {
+      throw await toReadableApiError(
+        error,
+        "이미지 업로드 완료 처리에 실패했습니다.",
+      )
+    }
   },
   async uploadEditorImage({
     docId,
@@ -138,22 +162,16 @@ const imageApi = {
 }
 
 const customFetch = async (url: string, init?: RequestInit) => {
-  // 새로운 init 객체 생성
-  const newInit = {
-    ...init,
-    // headers,
-  }
-
-  // 원래의 fetch 함수 호출
-  return fetch(url, newInit)
+  return fetch(url, init)
 }
 
-// API 클라이언트 설정
 const config = new Configuration({
-  basePath: BACKEND_API, // "http://localhost:8080",
+  basePath: apiBasePath,
   credentials: "include",
   fetchApi: customFetch,
 })
+
+const generatedImageApi = new ImageAPIApi(config)
 
 // 모든 API 클라이언트를 하나의 객체로 통합
 export const apiClient = {

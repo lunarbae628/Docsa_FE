@@ -31,11 +31,6 @@ import {
     SaveUpdateResponseToJSON,
 } from '../models/index';
 
-export interface DeleteSaveRequest {
-    docId: number;
-    saveId: number;
-}
-
 export interface GetSaveRequest {
     docId: number;
     saveId: number;
@@ -51,52 +46,6 @@ export interface UpdateSaveRequest {
  * 
  */
 export class SaveAPIApi extends runtime.BaseAPI {
-
-    /**
-     * 유저가 소유한 문서의 저장을 삭제합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
-     * 유저가 요청한 저장 id에 해당하는 저장 삭제
-     */
-    async deleteSaveRaw(requestParameters: DeleteSaveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        if (requestParameters['docId'] == null) {
-            throw new runtime.RequiredError(
-                'docId',
-                'Required parameter "docId" was null or undefined when calling deleteSave().'
-            );
-        }
-
-        if (requestParameters['saveId'] == null) {
-            throw new runtime.RequiredError(
-                'saveId',
-                'Required parameter "saveId" was null or undefined when calling deleteSave().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/api/document/{docId}/save/{saveId}`;
-        urlPath = urlPath.replace(`{${"docId"}}`, encodeURIComponent(String(requestParameters['docId'])));
-        urlPath = urlPath.replace(`{${"saveId"}}`, encodeURIComponent(String(requestParameters['saveId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'DELETE',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.VoidApiResponse(response);
-    }
-
-    /**
-     * 유저가 소유한 문서의 저장을 삭제합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
-     * 유저가 요청한 저장 id에 해당하는 저장 삭제
-     */
-    async deleteSave(requestParameters: DeleteSaveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.deleteSaveRaw(requestParameters, initOverrides);
-    }
 
     /**
      * 유저가 소유한 문서의 저장을 조회합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 

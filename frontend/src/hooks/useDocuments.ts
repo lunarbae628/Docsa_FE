@@ -18,10 +18,12 @@ function transformDocListResponse(apiDoc: DocListResponse) {
     createdAt: apiDoc.createdAt || new Date().toISOString(),
     updatedAt: apiDoc.updatedAt || new Date().toISOString(),
     preview: apiDoc.preview || "미리보기가 없습니다.",
-    recent: {
-      recentType: apiDoc.recent?.recentType || "SAVE",
-      recentTypeId: apiDoc.recent?.recentTypeId || 0,
-    },
+    recent: apiDoc.recent
+      ? {
+          recentType: apiDoc.recent.recentType,
+          recentTypeId: apiDoc.recent.recentTypeId,
+        }
+      : undefined,
   }
 }
 
@@ -76,7 +78,7 @@ export function useDocuments() {
 
   // 문서 목록
   const documents = useMemo(() => {
-    return data?.content ?? []
+    return (data?.content ?? []).map(transformDocListResponse)
   }, [data])
 
   // 페이지네이션 정보

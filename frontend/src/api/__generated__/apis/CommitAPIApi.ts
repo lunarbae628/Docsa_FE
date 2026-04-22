@@ -16,32 +16,20 @@
 import * as runtime from '../runtime';
 import type {
   CommitResponse,
-  CompareMergeCommitResponse,
   CreateCommitRequest,
   CreateCommitResponse,
   ErrorResponse,
-  MergeCommitRequest,
 } from '../models/index';
 import {
     CommitResponseFromJSON,
     CommitResponseToJSON,
-    CompareMergeCommitResponseFromJSON,
-    CompareMergeCommitResponseToJSON,
     CreateCommitRequestFromJSON,
     CreateCommitRequestToJSON,
     CreateCommitResponseFromJSON,
     CreateCommitResponseToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
-    MergeCommitRequestFromJSON,
-    MergeCommitRequestToJSON,
 } from '../models/index';
-
-export interface CompareMergeCommitRequest {
-    docId: number;
-    base: number;
-    target: number;
-}
 
 export interface CreateCommitOperationRequest {
     docId: number;
@@ -58,76 +46,10 @@ export interface GetCommitRequest {
     commitId: number;
 }
 
-export interface MergeCommitOperationRequest {
-    docId: number;
-    mergeCommitRequest: MergeCommitRequest;
-}
-
 /**
  * 
  */
 export class CommitAPIApi extends runtime.BaseAPI {
-
-    /**
-     * 유저가 소유한 문서에서 병합할 2개의 기록을 조회합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
-     * 병합할 2개의 기록을 조회합니다.
-     */
-    async compareMergeCommitRaw(requestParameters: CompareMergeCommitRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CompareMergeCommitResponse>> {
-        if (requestParameters['docId'] == null) {
-            throw new runtime.RequiredError(
-                'docId',
-                'Required parameter "docId" was null or undefined when calling compareMergeCommit().'
-            );
-        }
-
-        if (requestParameters['base'] == null) {
-            throw new runtime.RequiredError(
-                'base',
-                'Required parameter "base" was null or undefined when calling compareMergeCommit().'
-            );
-        }
-
-        if (requestParameters['target'] == null) {
-            throw new runtime.RequiredError(
-                'target',
-                'Required parameter "target" was null or undefined when calling compareMergeCommit().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        if (requestParameters['base'] != null) {
-            queryParameters['base'] = requestParameters['base'];
-        }
-
-        if (requestParameters['target'] != null) {
-            queryParameters['target'] = requestParameters['target'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/api/document/{docId}/merge`;
-        urlPath = urlPath.replace(`{${"docId"}}`, encodeURIComponent(String(requestParameters['docId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => CompareMergeCommitResponseFromJSON(jsonValue));
-    }
-
-    /**
-     * 유저가 소유한 문서에서 병합할 2개의 기록을 조회합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
-     * 병합할 2개의 기록을 조회합니다.
-     */
-    async compareMergeCommit(requestParameters: CompareMergeCommitRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CompareMergeCommitResponse> {
-        const response = await this.compareMergeCommitRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
 
     /**
      * 유저가 소유한 문서에서 새로운 기록(commit)을 만듭니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
@@ -268,55 +190,6 @@ export class CommitAPIApi extends runtime.BaseAPI {
      */
     async getCommit(requestParameters: GetCommitRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CommitResponse> {
         const response = await this.getCommitRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * 유저가 소유한 문서에서 기록 2개를 병합 합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
-     * request 에 담긴 2개의 commit id 를 기반으로 병합 합니다.
-     */
-    async mergeCommitRaw(requestParameters: MergeCommitOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CreateCommitResponse>> {
-        if (requestParameters['docId'] == null) {
-            throw new runtime.RequiredError(
-                'docId',
-                'Required parameter "docId" was null or undefined when calling mergeCommit().'
-            );
-        }
-
-        if (requestParameters['mergeCommitRequest'] == null) {
-            throw new runtime.RequiredError(
-                'mergeCommitRequest',
-                'Required parameter "mergeCommitRequest" was null or undefined when calling mergeCommit().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/api/document/{docId}/merge`;
-        urlPath = urlPath.replace(`{${"docId"}}`, encodeURIComponent(String(requestParameters['docId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-            body: MergeCommitRequestToJSON(requestParameters['mergeCommitRequest']),
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => CreateCommitResponseFromJSON(jsonValue));
-    }
-
-    /**
-     * 유저가 소유한 문서에서 기록 2개를 병합 합니다. 🔐 이 API는 세션 로그인 상태에서 호출되어야 하며, 클라이언트는 쿠키(`JSESSIONID`)를 통해 인증 정보를 전송해야 합니다. 
-     * request 에 담긴 2개의 commit id 를 기반으로 병합 합니다.
-     */
-    async mergeCommit(requestParameters: MergeCommitOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CreateCommitResponse> {
-        const response = await this.mergeCommitRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

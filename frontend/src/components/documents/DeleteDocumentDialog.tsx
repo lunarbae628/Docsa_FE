@@ -9,12 +9,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import type { Document } from "@/mock/DocumentList"
+import type { DocListResponse } from "@/api/__generated__"
 
 interface DeleteDocumentDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  document: Document | null
+  document: DocListResponse | null
   onConfirmDelete: () => void
   onCancel: () => void
 }
@@ -35,7 +35,7 @@ export default function DeleteDocumentDialog({
             {document?.title}'를 정말 삭제하시겠습니까?
           </AlertDialogTitle>
           <AlertDialogDescription className="text-base text-slate-600">
-            이 문서에 속한 모든 버전과 기록이 영구 삭제됩니다. 한 번 삭제한
+            이 문서에 속한 모든 브랜치와 기록이 영구 삭제됩니다. 한 번 삭제한
             <br />
             문서는 복구할 수 없습니다.
           </AlertDialogDescription>

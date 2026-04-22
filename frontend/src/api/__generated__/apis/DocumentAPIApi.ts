@@ -15,20 +15,20 @@
 
 import * as runtime from '../runtime';
 import type {
-  CommitGraphResponse,
   DocCreateResponse,
   DocTitleRequest,
   ErrorResponse,
+  GraphResponse,
 } from '../models/index';
 import {
-    CommitGraphResponseFromJSON,
-    CommitGraphResponseToJSON,
     DocCreateResponseFromJSON,
     DocCreateResponseToJSON,
     DocTitleRequestFromJSON,
     DocTitleRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
+    GraphResponseFromJSON,
+    GraphResponseToJSON,
 } from '../models/index';
 
 export interface DeleteRequest {
@@ -158,7 +158,7 @@ export class DocumentAPIApi extends runtime.BaseAPI {
      * 문서 ID를 기반으로 커밋 간선 정보와 브랜치 정보를 포함한 그래프 데이터를 조회합니다.
      * 문서 하나의 기록 그래프 조회
      */
-    async getGraphRaw(requestParameters: GetGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CommitGraphResponse>> {
+    async getGraphRaw(requestParameters: GetGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GraphResponse>> {
         if (requestParameters['docId'] == null) {
             throw new runtime.RequiredError(
                 'docId',
@@ -181,14 +181,14 @@ export class DocumentAPIApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => CommitGraphResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => GraphResponseFromJSON(jsonValue));
     }
 
     /**
      * 문서 ID를 기반으로 커밋 간선 정보와 브랜치 정보를 포함한 그래프 데이터를 조회합니다.
      * 문서 하나의 기록 그래프 조회
      */
-    async getGraph(requestParameters: GetGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CommitGraphResponse> {
+    async getGraph(requestParameters: GetGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GraphResponse> {
         const response = await this.getGraphRaw(requestParameters, initOverrides);
         return await response.value();
     }

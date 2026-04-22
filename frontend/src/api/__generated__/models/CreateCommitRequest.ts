@@ -13,14 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { BlockDto } from './BlockDto';
-import {
-    BlockDtoFromJSON,
-    BlockDtoFromJSONTyped,
-    BlockDtoToJSON,
-    BlockDtoToJSONTyped,
-} from './BlockDto';
-
 /**
  * 
  * @export
@@ -47,10 +39,10 @@ export interface CreateCommitRequest {
     branchId?: number;
     /**
      * 
-     * @type {Array<BlockDto>}
+     * @type {Array<{ [key: string]: any; }>}
      * @memberof CreateCommitRequest
      */
-    blocks?: Array<BlockDto>;
+    blocks?: Array<{ [key: string]: any; }>;
     /**
      * 
      * @type {Array<string>}
@@ -80,7 +72,7 @@ export function CreateCommitRequestFromJSONTyped(json: any, ignoreDiscriminator:
         'title': json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'branchId': json['branchId'] == null ? undefined : json['branchId'],
-        'blocks': json['blocks'] == null ? undefined : ((json['blocks'] as Array<any>).map(BlockDtoFromJSON)),
+        'blocks': json['blocks'] == null ? undefined : json['blocks'],
         'blockOrders': json['blockOrders'] == null ? undefined : json['blockOrders'],
     };
 }
@@ -99,7 +91,7 @@ export function CreateCommitRequestToJSONTyped(value?: CreateCommitRequest | nul
         'title': value['title'],
         'description': value['description'],
         'branchId': value['branchId'],
-        'blocks': value['blocks'] == null ? undefined : ((value['blocks'] as Array<any>).map(BlockDtoToJSON)),
+        'blocks': value['blocks'],
         'blockOrders': value['blockOrders'],
     };
 }

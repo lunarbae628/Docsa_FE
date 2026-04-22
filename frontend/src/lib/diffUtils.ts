@@ -5,6 +5,7 @@ export interface EditorBlock {
   id: string
   type: string
   data: Record<string, unknown>
+  tunes?: Record<string, unknown>
 }
 
 export interface BlockDiff {
@@ -57,6 +58,23 @@ export function blockToText(block: EditorBlock): string {
       return "---"
     case "image":
       return `![${(block.data.caption as string) || "Image"}](${(block.data.file as { url?: string })?.url || ""})`
+    case "columns": {
+      const columns = Array.isArray(block.data.columns)
+        ? block.data.columns.slice(0, 2)
+        : []
+
+      return columns
+        .map((column: any, index: number) => {
+          const blocks = Array.isArray(column?.blocks) ? column.blocks : []
+          return [
+            `Column ${index + 1}`,
+            blocks.map((item: EditorBlock) => blockToText(item)).join("\n\n"),
+          ]
+            .filter(Boolean)
+            .join("\n")
+        })
+        .join("\n\n")
+    }
     default:
       return JSON.stringify(block.data)
   }

@@ -11,6 +11,9 @@ interface BranchEditModalProps {
   isLoading?: boolean
   isLastCommit?: boolean
   defaultBranchName?: string
+  title?: string
+  submitLabel?: string
+  lockNameEdit?: boolean
 }
 
 export default function BranchEditModal({
@@ -20,15 +23,18 @@ export default function BranchEditModal({
   isLoading = false,
   isLastCommit = false,
   defaultBranchName = "",
+  title,
+  submitLabel = "브랜치 만들기",
+  lockNameEdit = false,
 }: BranchEditModalProps) {
   const [branchName, setBranchName] = useState("")
 
   // 모달이 열릴 때 기본값 설정
   useEffect(() => {
     if (isOpen) {
-      setBranchName(isLastCommit ? defaultBranchName : "")
+      setBranchName(defaultBranchName)
     }
-  }, [isOpen, defaultBranchName, isLastCommit])
+  }, [isOpen, defaultBranchName])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,26 +53,27 @@ export default function BranchEditModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isLastCommit
-              ? "이 버전에서 계속 작업하기"
-              : "새 버전으로 이어서 작업하기"}
+            {title ??
+              (isLastCommit
+                ? "현재 브랜치 열기"
+                : "새 브랜치 만들기")}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="branchName">버전 이름 *</Label>
+            <Label htmlFor="branchName">브랜치 이름 *</Label>
             <Input
               id="branchName"
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
-              placeholder="버전 이름을 입력하세요"
+              placeholder="브랜치 이름을 입력하세요"
               required
-              disabled={isLoading || isLastCommit}
+              disabled={isLoading || lockNameEdit}
               autoFocus
             />
-            {isLastCommit && (
+            {lockNameEdit && (
               <p className="text-sm text-gray-500">
-                현재 버전의 마지막 기록이므로 기존 버전에서 계속 작업합니다.
+                현재 브랜치의 마지막 기록이라 기존 브랜치를 바로 엽니다.
               </p>
             )}
           </div>
@@ -80,7 +87,7 @@ export default function BranchEditModal({
               취소
             </Button>
             <Button type="submit" disabled={!branchName.trim() || isLoading}>
-              {isLoading ? "생성 중..." : "생성하기"}
+              {isLoading ? "생성 중..." : submitLabel}
             </Button>
           </div>
         </form>

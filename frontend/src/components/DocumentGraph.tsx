@@ -1,11 +1,35 @@
-import ReactFlow, { Controls, Background, BackgroundVariant } from "reactflow"
+import { useCallback, useEffect, useMemo } from "react"
+import ReactFlow, {
+  Background,
+  BackgroundVariant,
+  Controls,
+  type OnInit,
+  type NodeMouseHandler,
+  type NodeProps,
+  useReactFlow,
+} from "reactflow"
 import "reactflow/dist/style.css"
-import { useState, useMemo, useCallback } from "react"
-import { useGraphRender } from "@/hooks/useGraphData"
+import BranchTabs from "@/components/BranchTabs"
 import CommitNode, { type CommitNodeMenuType } from "@/components/CommitNode"
 import TempNode, { type TempNodeMenuType } from "@/components/TempNode"
-import BranchTabs from "@/components/BranchTabs"
+import TimelineEdge from "@/components/TimelineEdge"
+import { useGraphRender } from "@/hooks/useGraphData"
 import type { Branch, GraphDataType } from "@/types/graph"
+type CompareSelectionState = {
+  active: boolean
+  baseKind: "commit" | "workspace"
+  baseId: number
+  targetKind: "commit" | "workspace" | null
+  targetId: number | null
+}
+
+type MergeSelectionState = {
+  active: boolean
+  sourceKind: "commit" | "workspace"
+  sourceId: number
+  targetKind: "commit" | "workspace" | null
+  targetId: number | null
+}
 
 export interface DocumentGraphProps {
   data: GraphDataType
@@ -18,7 +42,95 @@ export interface DocumentGraphProps {
     commitId: number,
     isLastCommit?: boolean,
   ) => void
+  onBranchSelect?: (branchId: number) => void
   onBranchDelete?: (branchId: number) => void
+  onBranchRename?: (branchId: number, newName: string) => void | Promise<void>
+  compareSelection?: CompareSelectionState | null
+  mergeSelection?: MergeSelectionState | null
+  onCompareTargetPick?: (kind: "commit" | "workspace", id: number) => void
+  onMergeTargetPick?: (kind: "commit" | "workspace", id: number) => void
+}
+
+const edgeTypes = {
+  timeline: TimelineEdge,
+}
+
+function AutoFitView({
+  nodeCount,
+  edgeCount,
+}: {
+  nodeCount: number
+  edgeCount: number
+}) {
+  const { fitView } = useReactFlow()
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 그래프 노드/엣지 수가 바뀔 때 화면을 다시 맞춘다.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      void fitView({ padding: 0.2, duration: 300 })
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [fitView, nodeCount, edgeCount])
+
+  return null
+}
+
+function CommitFlowNode({
+  data,
+}: NodeProps<{
+  commit: any
+  branchName: string
+  color: string
+  isCurrentCommit: boolean
+  isLastCommit: boolean
+  showMergeButton: boolean
+  onNodeMenuClick: DocumentGraphProps["onNodeMenuClick"]
+  isCurrentCommitLastCommit: boolean
+  selectionRole: "base" | "source" | "target" | null
+}>) {
+  return (
+    <CommitNode
+      commit={data.commit}
+      branchName={data.branchName}
+      color={data.color}
+      isCurrentCommit={data.isCurrentCommit}
+      isLastCommit={data.isLastCommit}
+      showMergeButton={data.showMergeButton && data.isCurrentCommitLastCommit}
+      onNodeMenuClick={data.onNodeMenuClick}
+      selectionRole={data.selectionRole}
+      openDropdownId={null}
+      setOpenDropdownId={() => {}}
+    />
+  )
+}
+
+function TempFlowNode({
+  data,
+}: NodeProps<{
+  saveId: number
+  branchName: string
+  color: string
+  isCurrentTemp: boolean
+  title: string
+  description: string
+  onNodeMenuClick: DocumentGraphProps["onNodeMenuClick"]
+  selectionRole: "base" | "source" | "target" | null
+}>) {
+  return (
+    <TempNode
+      tempId={data.saveId}
+      branchName={data.branchName}
+      color={data.color}
+      isCurrentTemp={data.isCurrentTemp}
+      title={data.title}
+      description={data.description}
+      onNodeMenuClick={data.onNodeMenuClick}
+      selectionRole={data.selectionRole}
+      openDropdownId={null}
+      setOpenDropdownId={() => {}}
+    />
+  )
 }
 
 export default function DocumentGraph({
@@ -28,24 +140,27 @@ export default function DocumentGraph({
   currentBranchId,
   mainBranch,
   onNodeMenuClick,
+  onBranchSelect,
   onBranchDelete,
+  onBranchRename,
+  compareSelection,
+  mergeSelection,
+  onCompareTargetPick,
+  onMergeTargetPick,
 }: DocumentGraphProps) {
-  // 현재 열린 드롭다운 ID를 관리
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
-
+  const flowKey = `${data.branches.length}-${data.commits.length}-${data.edges.length}`
   const activeCommitId =
     currentCommitId ??
-    (currentSaveId ? null : mainBranch?.leafCommitId?.toString())
+    (currentSaveId
+      ? null
+      : mainBranch?.leafCommitId != null
+        ? mainBranch.leafCommitId.toString()
+        : null)
   const activeSaveId = currentSaveId
-
   const isMainBranchLeafCommit =
-    mainBranch?.leafCommitId.toString() === activeCommitId
+    mainBranch?.leafCommitId != null &&
+    mainBranch.leafCommitId.toString() === activeCommitId
 
-  // 이벤트 핸들러 메모이제이션
-  const handleNodeMenuClick = onNodeMenuClick
-  const handleSetOpenDropdownId = setOpenDropdownId
-
-  // 커스텀 훅으로 노드와 엣지 데이터 생성
   const { nodes: rawNodes, edges } = useGraphRender({
     data,
     activeCommitId,
@@ -60,73 +175,279 @@ export default function DocumentGraph({
     currentBranch?.leafCommitId === Number(currentCommitId) &&
     !currentBranch?.saveId
 
-  // 노드에 label (CommitNode 컴포넌트) 추가 - 메모이제이션
-  const nodes = useMemo(() => {
-    return rawNodes.map((node: any) => ({
-      ...node,
-      data: {
-        ...node.data,
-        label:
-          node.data.nodeType === "commit" ? (
-            <CommitNode
-              commit={node.data.commit}
-              branchName={node.data.branchName}
-              color={node.data.color}
-              isCurrentCommit={node.data.isCurrentCommit}
-              isLastCommit={node.data.isLastCommit}
-              showMergeButton={
-                node.data.showMergeButton && isCurrentCommitLastCommit
-              }
-              onNodeMenuClick={handleNodeMenuClick}
-              openDropdownId={openDropdownId}
-              setOpenDropdownId={handleSetOpenDropdownId}
-            />
-          ) : (
-            <TempNode
-              tempId={node.data.saveId}
-              branchName={node.data.branchName}
-              color={node.data.color}
-              isCurrentTemp={node.data.isCurrentTemp}
-              title={node.data.title}
-              description={node.data.description}
-              onNodeMenuClick={handleNodeMenuClick}
-              openDropdownId={openDropdownId}
-              setOpenDropdownId={handleSetOpenDropdownId}
-            />
-          ),
-      },
-    }))
-  }, [
-    rawNodes,
-    openDropdownId,
-    handleNodeMenuClick,
-    handleSetOpenDropdownId,
-    isCurrentCommitLastCommit,
-  ])
+  const resolveCommitSelectionRole = useCallback(
+    (commitId: number | null | undefined) => {
+      if (!commitId) return null
+      if (
+        compareSelection?.active &&
+        compareSelection.baseKind === "commit" &&
+        compareSelection.baseId === commitId
+      ) {
+        return "base" as const
+      }
+      if (
+        compareSelection?.active &&
+        compareSelection.targetKind === "commit" &&
+        compareSelection.targetId === commitId
+      ) {
+        return "target" as const
+      }
+      if (
+        mergeSelection?.active &&
+        mergeSelection.sourceKind === "commit" &&
+        mergeSelection.sourceId === commitId
+      ) {
+        return "source" as const
+      }
+      if (
+        mergeSelection?.active &&
+        mergeSelection.targetKind === "commit" &&
+        mergeSelection.targetId === commitId
+      ) {
+        return "target" as const
+      }
+      return null
+    },
+    [compareSelection, mergeSelection],
+  )
+
+  const resolveWorkspaceSelectionRole = useCallback(
+    (saveId: number | null | undefined) => {
+      if (!saveId) return null
+      if (
+        compareSelection?.active &&
+        compareSelection.baseKind === "workspace" &&
+        compareSelection.baseId === saveId
+      ) {
+        return "base" as const
+      }
+      if (
+        compareSelection?.active &&
+        compareSelection.targetKind === "workspace" &&
+        compareSelection.targetId === saveId
+      ) {
+        return "target" as const
+      }
+      if (
+        mergeSelection?.active &&
+        mergeSelection.sourceKind === "workspace" &&
+        mergeSelection.sourceId === saveId
+      ) {
+        return "source" as const
+      }
+      if (
+        mergeSelection?.active &&
+        mergeSelection.targetKind === "workspace" &&
+        mergeSelection.targetId === saveId
+      ) {
+        return "target" as const
+      }
+      return null
+    },
+    [compareSelection, mergeSelection],
+  )
+
+  const nodes = useMemo(
+    () =>
+      rawNodes.map((node: any) => ({
+        ...node,
+        draggable: false,
+        selectable: false,
+        data: {
+          ...node.data,
+          onNodeMenuClick,
+          isCurrentCommitLastCommit,
+          selectionRole:
+            node.data.nodeType === "commit"
+              ? resolveCommitSelectionRole(node.data.commit?.id)
+              : node.data.nodeType === "temp"
+                ? resolveWorkspaceSelectionRole(node.data.saveId)
+                : null,
+        },
+      })),
+    [
+      rawNodes,
+      onNodeMenuClick,
+      isCurrentCommitLastCommit,
+      resolveCommitSelectionRole,
+      resolveWorkspaceSelectionRole,
+    ],
+  )
+
+  const nodeTypes = useMemo(
+    () => ({
+      commitNode: CommitFlowNode,
+      tempNode: TempFlowNode,
+    }),
+    [],
+  )
+
+  const handleInit: OnInit = (instance) => {
+    void instance.fitView({ padding: 0.2, duration: 0 })
+  }
+
+  const handleFlowNodeClick: NodeMouseHandler = (event, node: any) => {
+    const target = event.target as HTMLElement | null
+    if (target?.closest("[data-graph-action='true']")) {
+      return
+    }
+
+    if (node?.data?.nodeType === "commit" && node.data.commit) {
+      if (mergeSelection?.active) {
+        if (
+          onMergeTargetPick &&
+          !(
+            mergeSelection.sourceKind === "commit" &&
+            mergeSelection.sourceId === node.data.commit.id
+          )
+        ) {
+          onMergeTargetPick("commit", node.data.commit.id)
+        }
+        return
+      }
+
+      if (compareSelection?.active) {
+        if (
+          onCompareTargetPick &&
+          !(
+            compareSelection.baseKind === "commit" &&
+            compareSelection.baseId === node.data.commit.id
+          )
+        ) {
+          onCompareTargetPick("commit", node.data.commit.id)
+        }
+        return
+      }
+
+      onNodeMenuClick(
+        "commit-view",
+        node.data.commit.id,
+        Boolean(node.data.isLastCommit),
+      )
+      return
+    }
+
+    if (node?.data?.nodeType === "temp" && node.data.saveId) {
+      if (mergeSelection?.active) {
+        if (
+          onMergeTargetPick &&
+          !(
+            mergeSelection.sourceKind === "workspace" &&
+            mergeSelection.sourceId === node.data.saveId
+          )
+        ) {
+          onMergeTargetPick("workspace", node.data.saveId)
+        }
+        return
+      }
+
+      if (compareSelection?.active) {
+        if (
+          onCompareTargetPick &&
+          !(
+            compareSelection.baseKind === "workspace" &&
+            compareSelection.baseId === node.data.saveId
+          )
+        ) {
+          onCompareTargetPick("workspace", node.data.saveId)
+        }
+        return
+      }
+
+      onNodeMenuClick("temp-edit", node.data.saveId, false)
+    }
+  }
 
   return (
-    <div className="relative w-full h-full">
-      <div className="w-full h-full border border-gray-200 rounded-lg overflow-hidden">
-        {/* 버전 탭 */}
+    <div className="relative h-full w-full">
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-slate-200/90 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)] px-5 py-4">
+          <div>
+            <div className="text-base font-semibold tracking-[-0.03em] text-slate-900">
+              작업 흐름
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              {mergeSelection?.active
+                ? "병합할 기록을 그래프에서 선택하세요."
+                : compareSelection?.active
+                  ? "비교할 대상을 그래프에서 선택하세요."
+                  : "브랜치와 편집중 상태를 세로 그래프로 확인합니다."}
+            </div>
+          </div>
+        </div>
+
         <BranchTabs
           branches={data.branches}
           commits={data.commits}
           currentBranchId={currentBranchId}
+          onBranchSelect={onBranchSelect}
           onBranchDelete={onBranchDelete}
+          onBranchRename={onBranchRename}
         />
 
-        {/* 그래프 */}
-        <div className="w-full h-[calc(100%-60px)]">
+        <div className="min-h-0 flex-1 bg-[radial-gradient(circle_at_top,#f9fbff_0%,#f8fafc_45%,#f5f7fb_100%)]">
+          <style>{`
+            .doc-graph-flow,
+            .doc-graph-flow .react-flow__container,
+            .doc-graph-flow .react-flow__renderer,
+            .doc-graph-flow .react-flow__zoompane,
+            .doc-graph-flow .react-flow__selectionpane,
+            .doc-graph-flow .react-flow__viewport,
+            .doc-graph-flow .react-flow__pane {
+              cursor: default !important;
+            }
+            .doc-graph-flow .react-flow__node,
+            .doc-graph-flow .react-flow__node * {
+              cursor: pointer !important;
+            }
+            .doc-graph-flow .react-flow__controls {
+              box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12) !important;
+              border-radius: 18px !important;
+              overflow: hidden !important;
+              border: 1px solid #e2e8f0 !important;
+            }
+            .doc-graph-flow .react-flow__controls-button {
+              background: rgba(255,255,255,0.98) !important;
+              border-bottom: 1px solid #e2e8f0 !important;
+            }
+            .doc-graph-flow .react-flow__controls-button:last-child {
+              border-bottom: none !important;
+            }
+            .doc-graph-flow .react-flow__controls-button svg {
+              fill: #334155 !important;
+            }
+          `}</style>
           <ReactFlow
+            key={flowKey}
             nodes={nodes}
             edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            onInit={handleInit}
+            onNodeClick={handleFlowNodeClick}
             fitView
-            fitViewOptions={{
-              padding: 0.2,
-            }}
+            fitViewOptions={{ padding: 0.2 }}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            panOnDrag={true}
+            panOnScroll={true}
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            zoomOnDoubleClick={false}
+            selectionOnDrag={false}
+            selectionKeyCode={null}
+            className="doc-graph-flow bg-transparent"
+            proOptions={{ hideAttribution: true }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-            <Controls />
+            <AutoFitView nodeCount={nodes.length} edgeCount={edges.length} />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={18}
+              size={1.2}
+              color="#e2e8f0"
+            />
+            <Controls className="[&_button]:!h-9 [&_button]:!w-9 [&_button]:!text-slate-700 [&_button:hover]:!bg-slate-50" />
           </ReactFlow>
         </div>
       </div>

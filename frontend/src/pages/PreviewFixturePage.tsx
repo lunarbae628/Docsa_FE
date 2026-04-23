@@ -1,7 +1,8 @@
 import DocumentCompareView from "@/components/DocumentCompareView"
 import DocumentMergeView from "@/components/DocumentMergeView"
+import { generateAndStoreDocumentThumbnail } from "@/lib/documentThumbnails"
 import type { OutputData } from "@editorjs/editorjs"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 const previewImageUrl =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='300' viewBox='0 0 420 300'%3E%3Crect width='420' height='300' rx='28' fill='%23f8fafc'/%3E%3Ccircle cx='210' cy='130' r='62' fill='%230f172a'/%3E%3Cpath d='M146 188c32 34 96 34 128 0' fill='none' stroke='%230f172a' stroke-width='16' stroke-linecap='round'/%3E%3Cpath d='M122 88l88-34 88 34-88 34-88-34Z' fill='%230f172a'/%3E%3Cpath d='M154 89l56 22 56-22' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ctext x='210' y='258' text-anchor='middle' font-family='Arial' font-size='28' font-weight='700' fill='%23334155'%3EDocsa%3C/text%3E%3C/svg%3E"
@@ -391,6 +392,32 @@ const targetFixture: OutputData = {
 
 export default function PreviewFixturePage() {
   const [savedMerge, setSavedMerge] = useState<OutputData | null>(null)
+  const [thumbnailUrl, setThumbnailUrl] = useState("")
+  const [thumbnailStatus, setThumbnailStatus] = useState("생성 중")
+
+  useEffect(() => {
+    let isMounted = true
+
+    generateAndStoreDocumentThumbnail({
+      documentId: 999999,
+      blocks: baseFixture.blocks,
+    })
+      .then((dataUrl) => {
+        if (!isMounted) return
+        setThumbnailUrl(dataUrl ?? "")
+        setThumbnailStatus(dataUrl ? "생성 완료" : "생성 실패")
+      })
+      .catch((error) => {
+        console.warn("fixture 썸네일 생성에 실패했습니다.", error)
+        if (isMounted) {
+          setThumbnailStatus("생성 실패")
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-6 text-slate-900">
@@ -412,6 +439,31 @@ export default function PreviewFixturePage() {
               마지막 병합 결과: {savedMerge.blocks.length}개 블록
             </p>
           ) : null}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+            <div className="flex-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Thumbnail Fixture
+              </p>
+              <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+                문서 카드 썸네일
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                상태: {thumbnailStatus}
+              </p>
+            </div>
+            <div className="h-56 w-40 overflow-hidden rounded-sm border border-slate-200 bg-white shadow-sm">
+              {thumbnailUrl ? (
+                <img
+                  src={thumbnailUrl}
+                  alt="fixture 문서 썸네일"
+                  className="h-full w-full object-cover"
+                />
+              ) : null}
+            </div>
+          </div>
         </section>
 
         <section className="flex flex-col gap-3">

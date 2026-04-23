@@ -22,6 +22,7 @@ interface ColumnsToolData {
 
 interface ColumnsToolConfig {
   uploadImageByFile?: (file: File) => Promise<unknown>
+  uploadImageByUrl?: (url: string) => Promise<unknown>
 }
 
 interface ColumnsToolConstructor {
@@ -85,6 +86,7 @@ function normalizeLeftRatio(value: unknown) {
 
 function createNestedTools(
   uploadImageByFile?: ColumnsToolConfig["uploadImageByFile"],
+  uploadImageByUrl?: ColumnsToolConfig["uploadImageByUrl"],
 ) {
   return {
     header: {
@@ -134,6 +136,7 @@ function createNestedTools(
         uploader: uploadImageByFile
           ? {
               uploadByFile: uploadImageByFile,
+              uploadByUrl: uploadImageByUrl,
             }
           : undefined,
       },
@@ -285,7 +288,10 @@ export class ColumnsTool {
         minHeight: 0,
         data: createOutputData(this.data[index]?.blocks),
         placeholder: this.readOnly ? "" : "내용을 입력하세요...",
-        tools: createNestedTools(this.config.uploadImageByFile),
+        tools: createNestedTools(
+          this.config.uploadImageByFile,
+          this.config.uploadImageByUrl,
+        ),
         onChange: async () => {
           if (this.readOnly || this.destroyed) {
             return

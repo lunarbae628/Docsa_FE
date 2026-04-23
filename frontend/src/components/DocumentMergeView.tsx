@@ -1484,7 +1484,7 @@ export default function DocumentMergeView({
               ) : expandedPane === "right" ? (
                 <ExpandedReadOnlyDocument rows={rows} side="right" />
               ) : (
-                <div className="mx-auto h-full min-h-[860px] w-full max-w-[980px] bg-white px-10 py-10 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+                <div className="mx-auto min-h-[calc(100vh-128px)] w-full max-w-[980px] bg-white px-10 py-10 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
                   <DocumentEditor
                     ref={editorRef}
                     key="merge-result-expanded-editor"
@@ -1495,6 +1495,7 @@ export default function DocumentMergeView({
                     disableAutoUpdate={true}
                     minimalChrome={true}
                     contentLayout="document"
+                    fillHeight={false}
                   />
                 </div>
               )}

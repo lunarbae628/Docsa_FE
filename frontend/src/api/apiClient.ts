@@ -20,6 +20,7 @@ import type {
 export const BACKEND_API = import.meta.env.VITE_BACKEND_API
 
 const apiBasePath = (BACKEND_API || BASE_PATH).replace(/\/+$/, "")
+const IMAGE_UPLOAD_TIMEOUT_MS = 30_000
 
 async function parseApiError(response: Response, fallback: string) {
   try {
@@ -115,14 +116,32 @@ const imageApi = {
     }
   },
   async uploadToPresignedUrl(uploadUrl: string, file: File, method = "PUT") {
-    const response = await fetch(uploadUrl, {
-      method,
-      credentials: "omit",
-      headers: {
-        "Content-Type": file.type,
-      },
-      body: file,
-    })
+    const controller = new AbortController()
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      IMAGE_UPLOAD_TIMEOUT_MS,
+    )
+
+    let response: Response
+
+    try {
+      response = await fetch(uploadUrl, {
+        method,
+        credentials: "omit",
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("이미지 업로드 시간이 초과되었습니다.")
+      }
+      throw error
+    } finally {
+      window.clearTimeout(timeout)
+    }
 
     if (!response.ok) {
       throw new Error("이미지 파일 업로드에 실패했습니다.")
@@ -149,10 +168,11 @@ const imageApi = {
     docId: number
     file: File
   }) {
+    const contentType = file.type || "application/octet-stream"
     const upload = await imageApi.createUploadUrl({
       docId,
-      originalFileName: file.name || "image",
-      contentType: file.type,
+      originalFileName: file.name || "pasted-image",
+      contentType,
       size: file.size,
     })
 

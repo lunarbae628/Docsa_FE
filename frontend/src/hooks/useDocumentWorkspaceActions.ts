@@ -11,6 +11,7 @@ import type {
   WorkspaceRecord,
 } from "@/hooks/useDocumentWorkspaceBodyState"
 import { getApiErrorMessage } from "@/lib/apiError"
+import { generateAndStoreDocumentThumbnail } from "@/lib/documentThumbnails"
 import { editorDataToMarkdown } from "@/lib/editorMarkdown"
 import { alertDialog } from "@/lib/utils"
 import type { GraphDataType } from "@/types/graph"
@@ -407,6 +408,12 @@ export function useDocumentWorkspaceActions({
 
         try {
           await persistWorkspaceBlocks(currentWorkspace.id, nextBlocks)
+          void generateAndStoreDocumentThumbnail({
+            documentId,
+            blocks: nextBlocks,
+          }).catch((error) => {
+            console.warn("문서 썸네일 생성에 실패했습니다.", error)
+          })
 
           if (!pendingSaveRef.current) {
             setSyncStatus("synced")
@@ -445,6 +452,12 @@ export function useDocumentWorkspaceActions({
             : currentWorkspace.blocks
 
         await persistWorkspaceBlocks(currentWorkspace.id, currentBlocks)
+        void generateAndStoreDocumentThumbnail({
+          documentId,
+          blocks: currentBlocks,
+        }).catch((error) => {
+          console.warn("문서 썸네일 생성에 실패했습니다.", error)
+        })
         setSyncStatus("synced")
 
         const result = await apiClient.commit.createCommit({

@@ -39,7 +39,7 @@ export default function DocumentsGrid({
     <div
       className={
         viewMode === "grid"
-          ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          ? "grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-x-5 gap-y-7"
           : "space-y-4"
       }
     >

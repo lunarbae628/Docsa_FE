@@ -1,4 +1,5 @@
 import type { DocListResponse } from "@/api/__generated__/models/DocListResponse"
+import { Button } from "@/components/ui/button"
 import {
   Pagination,
   PaginationContent,
@@ -8,11 +9,19 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useCreateDocument } from "@/hooks/useCreateDocument"
 import { useDeleteDocument } from "@/hooks/useDeleteDocument"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useEditDocument } from "@/hooks/useEditDocument"
 import { getDocumentWorkspacePath } from "@/lib/documentRoute"
+import { Grid3X3, List, Plus } from "lucide-react"
 import { useNavigate } from "react-router"
 import Loading from "./Loading"
 import CreateDocumentModal from "./documents/CreateDocumentModal"
@@ -109,25 +118,67 @@ export default function DocumentsList() {
   }
 
   return (
-    <div className="h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50">
       {/* 메인 컨텐츠 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 검색 및 새 문서 생성 */}
+      <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
         <SearchAndCreateBar
           searchQuery={searchQuery}
           inputValue={inputValue}
           setInputValue={setInputValue}
           handleSearch={handleSearch}
           handleResetSearch={handleResetSearch}
-          viewMode={viewMode}
-          toggleViewMode={toggleViewMode}
-          onCreateClick={createDocument.openCreateModal}
-          sort={sort}
-          setSort={setSort}
-          order={order}
-          setOrder={setOrder}
         />
 
+        <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-base font-medium text-slate-900">최근 문서</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {searchQuery
+                ? `'${searchQuery}' 검색 결과`
+                : `총 ${pagination.totalElements}개 문서`}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={sort} onValueChange={setSort}>
+              <SelectTrigger className="h-9 w-28 rounded-full border-slate-200 bg-white text-slate-600 shadow-sm">
+                <SelectValue placeholder="정렬" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="updatedAt">수정일</SelectItem>
+                <SelectItem value="title">제목</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={order} onValueChange={setOrder}>
+              <SelectTrigger className="h-9 w-28 rounded-full border-slate-200 bg-white text-slate-600 shadow-sm">
+                <SelectValue placeholder="순서" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">내림차순</SelectItem>
+                <SelectItem value="asc">오름차순</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleViewMode}
+              className="h-9 w-9 rounded-full border-slate-200 bg-white p-0 text-slate-600 shadow-sm hover:bg-slate-50"
+              type="button"
+            >
+              {viewMode === "grid" ? (
+                <List className="h-4 w-4" />
+              ) : (
+                <Grid3X3 className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              onClick={createDocument.openCreateModal}
+              className="h-9 rounded-full bg-slate-900 px-4 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+              type="button"
+            >
+              <Plus className="mr-1.5 h-4 w-4" />새 문서
+            </Button>
+          </div>
+        </section>
         {/* 문서 리스트 */}
         <DocumentsGrid
           documents={documents}

@@ -4,6 +4,7 @@ import { apiClient } from "@/api/apiClient"
 import { useAuth } from "./useAuth"
 import type { DocListResponse } from "@/api/__generated__"
 import type { PageDocListResponse } from "@/api/__generated__/models/PageDocListResponse"
+import { getStoredDocumentThumbnail } from "@/lib/documentThumbnails"
 
 const PAGE_SIZE = 12
 
@@ -18,6 +19,7 @@ function transformDocListResponse(apiDoc: DocListResponse) {
     createdAt: apiDoc.createdAt || new Date().toISOString(),
     updatedAt: apiDoc.updatedAt || new Date().toISOString(),
     preview: apiDoc.preview || "미리보기가 없습니다.",
+    thumbnailUrl: getStoredDocumentThumbnail(apiDoc.id),
     recent: apiDoc.recent
       ? {
           recentType: apiDoc.recent.recentType,

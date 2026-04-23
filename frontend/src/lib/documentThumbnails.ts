@@ -490,7 +490,7 @@ async function drawBlock(
       const frameWidth = stretched
         ? bounds.width
         : Math.min(bounds.width, resizeWidth ?? bounds.width)
-      const frameX = bounds.x + (bounds.width - frameWidth) / 2
+      const frameX = bounds.x
       const padding = withBackground ? 34 : withBorder ? 12 : 0
 
       if (url) {

@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { FileText, MoreVertical, Edit, Trash2 } from "lucide-react"
+import { MoreVertical, Edit, Trash2 } from "lucide-react"
 import { formatDate, formatDateForDocuments } from "@/lib/date"
 import type { DocListResponse } from "@/api/__generated__/models/DocListResponse"
 import { getBlankDocumentThumbnailDataUrl } from "@/lib/documentThumbnails"
@@ -50,7 +50,7 @@ export default function DocumentCard({
 
   return (
     <Card
-      className="group relative gap-0 overflow-hidden rounded-sm border border-slate-200 bg-white py-0 shadow-none transition-colors hover:border-blue-400"
+      className="group relative w-full gap-0 overflow-hidden rounded-sm border border-slate-200 bg-white py-0 shadow-none transition-colors hover:border-blue-400"
       onClick={() => onDocumentClick(document)}
     >
       <CardContent className="p-0">
@@ -58,7 +58,7 @@ export default function DocumentCard({
           // 그리드 뷰
           <div>
             {/* 미리보기 영역 */}
-            <div className="flex aspect-[360/509] min-h-0 items-center justify-center border-slate-200 border-b bg-white">
+            <div className="flex aspect-[208/263] min-h-0 items-center justify-center overflow-hidden border-slate-200 border-b bg-white">
               {thumbnailUrl ? (
                 <img
                   src={thumbnailUrl}

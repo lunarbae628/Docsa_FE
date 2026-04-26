@@ -5,6 +5,7 @@ apis/DocumentAPIApi.ts
 apis/ImageAPIApi.ts
 apis/MergeAPIApi.ts
 apis/SaveAPIApi.ts
+apis/ThumbnailAPIApi.ts
 apis/UserAPIApi.ts
 apis/index.ts
 index.ts
@@ -36,6 +37,9 @@ models/SaveUpdateRequest.ts
 models/SaveUpdateResponse.ts
 models/SessionCheckResponse.ts
 models/SignupCodeRequest.ts
+models/ThumbnailFinalizeRequest.ts
+models/ThumbnailResponse.ts
+models/ThumbnailSyncResponse.ts
 models/UserLoginRequest.ts
 models/UserLoginResponse.ts
 models/UserSignupRequest.ts

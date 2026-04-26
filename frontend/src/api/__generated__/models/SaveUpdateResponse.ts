@@ -13,18 +13,32 @@
  */
 
 import { mapValues } from '../runtime';
+import type { ThumbnailSyncResponse } from './ThumbnailSyncResponse';
+import {
+    ThumbnailSyncResponseFromJSON,
+    ThumbnailSyncResponseFromJSONTyped,
+    ThumbnailSyncResponseToJSON,
+    ThumbnailSyncResponseToJSONTyped,
+} from './ThumbnailSyncResponse';
+
 /**
- * 
+ * 저장 수정 응답
  * @export
  * @interface SaveUpdateResponse
  */
 export interface SaveUpdateResponse {
     /**
-     * 
+     * 저장 수정 시각
      * @type {Date}
      * @memberof SaveUpdateResponse
      */
     updatedAt?: Date;
+    /**
+     * 프론트 썸네일 동기화 판단에 필요한 정보
+     * @type {ThumbnailSyncResponse}
+     * @memberof SaveUpdateResponse
+     */
+    thumbnail?: ThumbnailSyncResponse;
 }
 
 /**
@@ -45,6 +59,7 @@ export function SaveUpdateResponseFromJSONTyped(json: any, ignoreDiscriminator: 
     return {
         
         'updatedAt': json['updatedAt'] == null ? undefined : (new Date(json['updatedAt'])),
+        'thumbnail': json['thumbnail'] == null ? undefined : ThumbnailSyncResponseFromJSON(json['thumbnail']),
     };
 }
 
@@ -60,6 +75,7 @@ export function SaveUpdateResponseToJSONTyped(value?: SaveUpdateResponse | null,
     return {
         
         'updatedAt': value['updatedAt'] == null ? undefined : ((value['updatedAt']).toISOString()),
+        'thumbnail': ThumbnailSyncResponseToJSON(value['thumbnail']),
     };
 }
 

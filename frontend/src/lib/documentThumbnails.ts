@@ -1,6 +1,5 @@
 import type { EditorBlock } from "@/lib/diffUtils"
 
-const THUMBNAIL_STORAGE_PREFIX = "docsa:document-thumbnail:v6:"
 const THUMBNAIL_WIDTH = 360
 const THUMBNAIL_HEIGHT = 509
 const CANVAS_SCALE = 2
@@ -25,29 +24,11 @@ type DrawBounds = {
   width: number
 }
 
-function getThumbnailStorageKey(documentId: number) {
-  return `${THUMBNAIL_STORAGE_PREFIX}${documentId}`
-}
-
-export function getStoredDocumentThumbnail(documentId: number | undefined) {
-  if (!documentId || typeof window === "undefined") return undefined
-
-  try {
-    return (
-      window.localStorage.getItem(getThumbnailStorageKey(documentId)) ??
-      undefined
-    )
-  } catch {
-    return undefined
-  }
-}
-
-function storeDocumentThumbnail(documentId: number, dataUrl: string) {
-  try {
-    window.localStorage.setItem(getThumbnailStorageKey(documentId), dataUrl)
-  } catch (error) {
-    console.warn("문서 썸네일 저장에 실패했습니다.", error)
-  }
+export type DocumentThumbnailArtifact = {
+  dataUrl: string
+  blob: Blob
+  file: File
+  signature: string
 }
 
 function decodeText(value: unknown) {
@@ -637,6 +618,51 @@ function drawThumbnailPageBase(context: CanvasRenderingContext2D) {
   context.strokeRect(1, 1, RENDER_WIDTH - 2, RENDER_HEIGHT - 2)
 }
 
+function canvasToJpegBlob(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("썸네일 이미지를 만들 수 없습니다."))
+          return
+        }
+
+        resolve(blob)
+      },
+      "image/jpeg",
+      0.86,
+    )
+  })
+}
+
+function arrayBufferToHex(buffer: ArrayBuffer) {
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+async function createThumbnailSignature(blob: Blob) {
+  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer())
+  return `sha256:${arrayBufferToHex(digest)}`
+}
+
+async function createThumbnailArtifact(canvas: HTMLCanvasElement) {
+  const blob = await canvasToJpegBlob(canvas)
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.86)
+  const signature = await createThumbnailSignature(blob)
+  const file = new File([blob], "document-thumbnail.jpg", {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  })
+
+  return {
+    dataUrl,
+    blob,
+    file,
+    signature,
+  }
+}
+
 export function getBlankDocumentThumbnailDataUrl() {
   if (blankDocumentThumbnailDataUrl) {
     return blankDocumentThumbnailDataUrl
@@ -652,14 +678,12 @@ export function getBlankDocumentThumbnailDataUrl() {
   return blankDocumentThumbnailDataUrl
 }
 
-export async function generateAndStoreDocumentThumbnail({
-  documentId,
+export async function generateDocumentThumbnailArtifact({
   blocks,
 }: {
-  documentId: number
   blocks: unknown[]
-}) {
-  if (!documentId || typeof document === "undefined") {
+}): Promise<DocumentThumbnailArtifact | undefined> {
+  if (typeof document === "undefined") {
     return undefined
   }
 
@@ -690,7 +714,5 @@ export async function generateAndStoreDocumentThumbnail({
     )
   }
 
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.86)
-  storeDocumentThumbnail(documentId, dataUrl)
-  return dataUrl
+  return createThumbnailArtifact(canvas)
 }

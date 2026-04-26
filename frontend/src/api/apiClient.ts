@@ -6,15 +6,19 @@ import {
   Configuration,
   DocumentAPIApi,
   ImageAPIApi,
+  ImageUploadUrlRequestPurposeEnum,
   MergeAPIApi,
   ResponseError,
   SaveAPIApi,
+  ThumbnailAPIApi,
   UserAPIApi,
 } from "./__generated__"
 import type {
   ImageUploadCompleteResponse,
   ImageUploadUrlRequest,
   ImageUploadUrlResponse,
+  ThumbnailFinalizeRequest,
+  ThumbnailResponse,
 } from "./__generated__"
 
 export const BACKEND_API = import.meta.env.VITE_BACKEND_API
@@ -60,6 +64,19 @@ async function toReadableApiError(
   }
 
   return new Error(fallbackErrorMessage)
+}
+
+async function isStaleThumbnailError(error: unknown) {
+  if (!(error instanceof ResponseError)) {
+    return false
+  }
+
+  try {
+    const responseText = await error.response.clone().text()
+    return responseText.toLowerCase().includes("stale")
+  } catch {
+    return false
+  }
 }
 
 function assertUploadUrlResponse(
@@ -174,10 +191,50 @@ const imageApi = {
       originalFileName: file.name || "pasted-image",
       contentType,
       size: file.size,
+      purpose: ImageUploadUrlRequestPurposeEnum.DocContent,
     })
 
     await imageApi.uploadToPresignedUrl(upload.uploadUrl, file, upload.method)
     return imageApi.completeUpload(upload.imageId)
+  },
+  async uploadDocumentThumbnail({
+    docId,
+    file,
+  }: {
+    docId: number
+    file: File
+  }) {
+    const contentType = file.type || "image/jpeg"
+    const upload = await imageApi.createUploadUrl({
+      docId,
+      originalFileName: file.name || "document-thumbnail.jpg",
+      contentType,
+      size: file.size,
+      purpose: ImageUploadUrlRequestPurposeEnum.DocThumbnail,
+    })
+
+    await imageApi.uploadToPresignedUrl(upload.uploadUrl, file, upload.method)
+    return imageApi.completeUpload(upload.imageId)
+  },
+}
+
+const thumbnailApi = {
+  async finalizeDocumentThumbnail(
+    docId: number,
+    request: ThumbnailFinalizeRequest,
+  ): Promise<ThumbnailResponse | undefined> {
+    try {
+      return await generatedThumbnailApi.finalizeThumbnail({
+        docId,
+        thumbnailFinalizeRequest: request,
+      })
+    } catch (error) {
+      if (await isStaleThumbnailError(error)) {
+        return undefined
+      }
+
+      throw await toReadableApiError(error, "문서 썸네일 확정에 실패했습니다.")
+    }
   },
 }
 
@@ -192,6 +249,7 @@ const config = new Configuration({
 })
 
 const generatedImageApi = new ImageAPIApi(config)
+const generatedThumbnailApi = new ThumbnailAPIApi(config)
 
 // 모든 API 클라이언트를 하나의 객체로 통합
 export const apiClient = {
@@ -203,4 +261,5 @@ export const apiClient = {
   image: imageApi,
   merge: new MergeAPIApi(config),
   save: new SaveAPIApi(config),
+  thumbnail: thumbnailApi,
 }

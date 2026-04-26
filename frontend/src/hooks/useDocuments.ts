@@ -4,22 +4,31 @@ import { apiClient } from "@/api/apiClient"
 import { useAuth } from "./useAuth"
 import type { DocListResponse } from "@/api/__generated__"
 import type { PageDocListResponse } from "@/api/__generated__/models/PageDocListResponse"
-import { getStoredDocumentThumbnail } from "@/lib/documentThumbnails"
 
 const PAGE_SIZE = 12
 
 type Sort = "title" | "updatedAt"
 type Order = "asc" | "desc"
 
+type DocListResponseWithThumbnail = DocListResponse & {
+  thumbnailUrl?: string
+  thumbnail?: {
+    thumbnailUrl?: string
+  }
+}
+
 // API 응답을 프론트엔드 Document 타입으로 변환
 function transformDocListResponse(apiDoc: DocListResponse) {
+  const docWithThumbnail = apiDoc as DocListResponseWithThumbnail
+
   return {
     id: apiDoc.id || 0,
     title: apiDoc.title || "제목 없음",
     createdAt: apiDoc.createdAt || new Date().toISOString(),
     updatedAt: apiDoc.updatedAt || new Date().toISOString(),
     preview: apiDoc.preview || "미리보기가 없습니다.",
-    thumbnailUrl: getStoredDocumentThumbnail(apiDoc.id),
+    thumbnailUrl:
+      docWithThumbnail.thumbnail?.thumbnailUrl ?? docWithThumbnail.thumbnailUrl,
     recent: apiDoc.recent
       ? {
           recentType: apiDoc.recent.recentType,

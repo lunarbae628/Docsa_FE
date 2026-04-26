@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { apiClient } from "@/api/apiClient"
 import { CodeCheckRequestTypeEnum } from "@/api/__generated__"
+import { getApiErrorMessage } from "@/lib/apiError"
 
 const signupSchema = z
   .object({
@@ -78,7 +79,7 @@ export default function SignupForm({
   const [dialogContent, setDialogContent] = useState({
     title: "",
     description: "",
-    type: "info" as "info" | "success",
+    type: "info" as "info" | "success" | "error",
   })
 
   const {
@@ -153,9 +154,19 @@ export default function SignupForm({
       setShowDialog(true)
     } catch (error) {
       console.error("인증코드 확인 실패:", error)
+      const message = await getApiErrorMessage(
+        error,
+        "인증코드가 올바르지 않습니다. 다시 시도해주세요.",
+      )
       setError("verificationCode", {
-        message: "인증코드가 올바르지 않습니다. 다시 시도해주세요.",
+        message,
       })
+      setDialogContent({
+        title: "인증 실패",
+        description: message,
+        type: "error",
+      })
+      setShowDialog(true)
     } finally {
       setIsLoading(false)
     }
@@ -190,6 +201,15 @@ export default function SignupForm({
       setShowDialog(true)
     } catch (error) {
       console.error("회원가입 실패:", error)
+      setDialogContent({
+        title: "회원가입 실패",
+        description: await getApiErrorMessage(
+          error,
+          "회원가입에 실패했습니다. 다시 시도해주세요.",
+        ),
+        type: "error",
+      })
+      setShowDialog(true)
     } finally {
       setIsLoading(false)
     }
@@ -211,6 +231,10 @@ export default function SignupForm({
       })
       console.log("인증코드 발송 응답:", response)
 
+      setIsCodeSent(true)
+      setCanResend(false)
+      setResendTimer(300)
+
       setDialogContent({
         title: "인증코드 발송",
         description: "인증코드가 발송되었습니다!",
@@ -219,6 +243,15 @@ export default function SignupForm({
       setShowDialog(true)
     } catch (error) {
       console.error("인증코드 발송 실패:", error)
+      setDialogContent({
+        title: "인증코드 발송 실패",
+        description: await getApiErrorMessage(
+          error,
+          "인증코드 발송에 실패했습니다. 다시 시도해주세요.",
+        ),
+        type: "error",
+      })
+      setShowDialog(true)
     } finally {
       setIsLoading(false)
     }
@@ -493,7 +526,13 @@ export default function SignupForm({
           <DialogHeader>
             <div className="flex items-center gap-2">
               <CheckCircle
-                className={`h-5 w-5 ${dialogContent.type === "success" ? "text-green-600" : "text-blue-600"}`}
+                className={`h-5 w-5 ${
+                  dialogContent.type === "success"
+                    ? "text-green-600"
+                    : dialogContent.type === "error"
+                      ? "text-red-600"
+                      : "text-blue-600"
+                }`}
               />
               <DialogTitle className="text-lg font-semibold">
                 {dialogContent.title}

@@ -320,7 +320,7 @@ export default function LandingConceptDemoPage() {
                 '"SF Pro Display","SUIT Variable","Pretendard Variable","Apple SD Gothic Neo",sans-serif',
             }}
           >
-            브랜치 관리의 악몽, <br />
+            버전 관리의 악몽, <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-pink-500 to-orange-600 drop-shadow-[0_10px_30px_rgba(249,115,22,0.4)]">
               이제 끝내다.
             </span>

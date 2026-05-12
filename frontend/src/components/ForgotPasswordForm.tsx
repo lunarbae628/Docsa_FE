@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { apiClient } from "@/api/apiClient"
 import { CodeCheckRequestTypeEnum } from "@/api/__generated__"
+import { getApiErrorMessage } from "@/lib/apiError"
 
 const emailVerificationSchema = z.object({
   email: z.string().email("올바른 이메일 주소를 입력해주세요"),
@@ -83,7 +84,7 @@ export default function ForgotPasswordForm({
   const [dialogContent, setDialogContent] = useState({
     title: "",
     description: "",
-    type: "info" as "info" | "success",
+    type: "info" as "info" | "success" | "error",
   })
 
   /* ── 1단계 폼 ── */
@@ -158,9 +159,19 @@ export default function ForgotPasswordForm({
       setShowDialog(true)
     } catch (error) {
       console.error("인증코드 확인 실패:", error)
+      const message = await getApiErrorMessage(
+        error,
+        "인증코드가 올바르지 않습니다. 다시 시도해주세요.",
+      )
       emailForm.setError("verificationCode", {
-        message: "인증코드가 올바르지 않습니다. 다시 시도해주세요.",
+        message,
       })
+      setDialogContent({
+        title: "인증 실패",
+        description: message,
+        type: "error",
+      })
+      setShowDialog(true)
     } finally {
       setIsLoading(false)
     }
@@ -192,6 +203,17 @@ export default function ForgotPasswordForm({
         type: "info",
       })
       setShowDialog(true)
+    } catch (error) {
+      console.error("인증코드 발송 실패:", error)
+      setDialogContent({
+        title: "인증코드 발송 실패",
+        description: await getApiErrorMessage(
+          error,
+          "인증코드 발송에 실패했습니다. 다시 시도해주세요.",
+        ),
+        type: "error",
+      })
+      setShowDialog(true)
     } finally {
       setIsLoading(false)
     }
@@ -217,12 +239,6 @@ export default function ForgotPasswordForm({
       })
 
       setStep(2)
-      setDialogContent({
-        title: "인증 완료",
-        description: "이제 새 비밀번호를 설정해주세요!",
-        type: "success",
-      })
-      setShowDialog(true)
     } catch {
       emailForm.setError("root", {
         message: "인증에 실패했습니다. 다시 시도해주세요.",
@@ -248,14 +264,22 @@ export default function ForgotPasswordForm({
 
       setDialogContent({
         title: "비밀번호 변경 완료",
-        description: "비밀번호가 변경되었습니다! 이제 로그인하세요.",
+        description: "비밀번호가 변경되었습니다.",
         type: "success",
       })
       setShowDialog(true)
-    } catch {
-      passwordForm.setError("root", {
-        message: "비밀번호 변경에 실패했습니다. 다시 시도해주세요.",
+    } catch (error) {
+      const message = await getApiErrorMessage(
+        error,
+        "비밀번호 변경에 실패했습니다. 다시 시도해주세요.",
+      )
+      passwordForm.setError("root", { message })
+      setDialogContent({
+        title: "비밀번호 변경 실패",
+        description: message,
+        type: "error",
       })
+      setShowDialog(true)
     } finally {
       setIsLoading(false)
     }
@@ -569,7 +593,13 @@ export default function ForgotPasswordForm({
           <DialogHeader>
             <div className="flex items-center gap-2">
               <CheckCircle
-                className={`h-5 w-5 ${dialogContent.type === "success" ? "text-green-600" : "text-blue-600"}`}
+                className={`h-5 w-5 ${
+                  dialogContent.type === "success"
+                    ? "text-green-600"
+                    : dialogContent.type === "error"
+                      ? "text-red-600"
+                      : "text-blue-600"
+                }`}
               />
               <DialogTitle className="text-lg font-semibold">
                 {dialogContent.title}

@@ -37,6 +37,7 @@ interface DocumentEditorProps {
   enableMarkdownShortcuts?: boolean
   minimalChrome?: boolean
   contentLayout?: "full" | "document"
+  fillHeight?: boolean
 }
 
 export interface DocumentEditorRef {
@@ -197,6 +198,63 @@ function isMarkdownShortcutCandidate(text: string) {
   )
 }
 
+function getImageFileExtension(contentType: string) {
+  switch (contentType.toLowerCase()) {
+    case "image/jpeg":
+      return "jpg"
+    case "image/png":
+      return "png"
+    case "image/gif":
+      return "gif"
+    case "image/webp":
+      return "webp"
+    case "image/svg+xml":
+      return "svg"
+    default:
+      return "bin"
+  }
+}
+
+function normalizeUploadImageFile(file: File) {
+  const contentType = file.type || "image/png"
+  const fileName =
+    file.name ||
+    `pasted-image-${Date.now()}.${getImageFileExtension(contentType)}`
+
+  if (file.name && file.type) {
+    return file
+  }
+
+  return new File([file], fileName, {
+    type: contentType,
+    lastModified: file.lastModified || Date.now(),
+  })
+}
+
+async function createImageFileFromUrl(url: string) {
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error("붙여넣은 이미지를 불러오지 못했습니다.")
+  }
+
+  const blob = await response.blob()
+  const contentType = blob.type || "image/png"
+  const urlFileName = url.startsWith("data:")
+    ? ""
+    : decodeURIComponent(
+        new URL(url, window.location.href).pathname.split("/").pop() || "",
+      )
+  const fileName =
+    urlFileName ||
+    `pasted-image-${Date.now()}.${getImageFileExtension(contentType)}`
+
+  return new File([blob], fileName, {
+    type: contentType,
+    lastModified: Date.now(),
+  })
+}
+
 const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
   (
     {
@@ -211,6 +269,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       enableMarkdownShortcuts = false,
       minimalChrome = false,
       contentLayout = "full",
+      fillHeight = true,
     },
     ref,
   ) => {
@@ -236,9 +295,10 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
         }
 
         try {
+          const uploadFile = normalizeUploadImageFile(file)
           const uploaded = await apiClient.image.uploadEditorImage({
             docId: documentId,
-            file,
+            file: uploadFile,
           })
 
           return {
@@ -249,7 +309,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
               objectKey: uploaded.objectKey,
               contentType: uploaded.contentType,
               size: uploaded.size,
-              name: file.name,
+              name: uploadFile.name,
             },
           }
         } catch (error) {
@@ -262,6 +322,23 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
         }
       },
       [documentId],
+    )
+
+    const uploadImageByUrl = useCallback(
+      async (url: string) => {
+        try {
+          const file = await createImageFileFromUrl(url)
+          return uploadImageByFile(file)
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "이미지 업로드에 실패했습니다."
+          await alertDialog(message, "이미지 업로드 실패", "destructive")
+          return { success: 0 }
+        }
+      },
+      [uploadImageByFile],
     )
 
     const normalizeBlocksForCompare = useCallback((data: OutputData) => {
@@ -436,6 +513,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
             class: ColumnsTool,
             config: {
               uploadImageByFile,
+              uploadImageByUrl,
             },
           },
           delimiter: Delimiter,
@@ -454,6 +532,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
               },
               uploader: {
                 uploadByFile: uploadImageByFile,
+                uploadByUrl: uploadImageByUrl,
               },
             },
           },
@@ -607,6 +686,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       enableMarkdownShortcuts,
       normalizeBlocksForCompare,
       uploadImageByFile,
+      uploadImageByUrl,
     ]) // 편집 모드 변경에만 반응
 
     // initialData 변경 시 에디터 내용 업데이트 (재생성 없이)
@@ -643,10 +723,12 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
     }, [saveData])
 
     return (
-      <div className="w-full h-full">
+      <div className={`w-full ${fillHeight ? "h-full" : "min-h-full"}`}>
         <div
           ref={containerRef}
-          className={`document-editor-shell h-full min-h-full ${
+          className={`document-editor-shell ${
+            fillHeight ? "h-full min-h-full" : "min-h-full"
+          } ${
             contentLayout === "document"
               ? "document-editor-shell--document"
               : ""
@@ -667,7 +749,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           .document-editor-shell .codex-editor,
           .document-editor-shell .codex-editor__redactor {
             min-height: 100% !important;
-            height: 100% !important;
+            height: ${fillHeight ? "100%" : "auto"} !important;
             padding-bottom: 0 !important;
           }
 

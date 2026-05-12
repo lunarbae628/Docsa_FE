@@ -2,6 +2,7 @@ import { apiClient } from "@/api/apiClient"
 import type { CommitNodeMenuType } from "@/components/CommitNode"
 import type { TempNodeMenuType } from "@/components/TempNode"
 import { useDialog } from "@/components/ui/alert-dialog"
+import type { ThumbnailSyncResponse } from "@/api/__generated__"
 import type {
   BranchRecord,
   CommitRecord,
@@ -11,6 +12,7 @@ import type {
   WorkspaceRecord,
 } from "@/hooks/useDocumentWorkspaceBodyState"
 import { getApiErrorMessage } from "@/lib/apiError"
+import { generateDocumentThumbnailArtifact } from "@/lib/documentThumbnails"
 import { editorDataToMarkdown } from "@/lib/editorMarkdown"
 import { alertDialog } from "@/lib/utils"
 import type { GraphDataType } from "@/types/graph"
@@ -41,6 +43,40 @@ type MergeBranchState = {
 type PendingWorkspaceSave = {
   saveId: number
   blocks: SnapshotBlock[]
+}
+
+async function syncDocumentThumbnail({
+  documentId,
+  blocks,
+  thumbnail,
+}: {
+  documentId: number
+  blocks: SnapshotBlock[]
+  thumbnail: ThumbnailSyncResponse | undefined
+}) {
+  if (typeof thumbnail?.requestToken !== "number") {
+    return
+  }
+
+  const artifact = await generateDocumentThumbnailArtifact({ blocks })
+  if (!artifact) {
+    return
+  }
+
+  if (thumbnail.signature === artifact.signature) {
+    return
+  }
+
+  const uploaded = await apiClient.image.uploadDocumentThumbnail({
+    docId: documentId,
+    file: artifact.file,
+  })
+
+  await apiClient.thumbnail.finalizeDocumentThumbnail(documentId, {
+    imageId: uploaded.imageId,
+    requestToken: thumbnail.requestToken,
+    signature: artifact.signature,
+  })
 }
 
 function toBranchSlug(value: string) {
@@ -352,13 +388,26 @@ export function useDocumentWorkspaceActions({
       const saveRequest = saveQueueRef.current
         .catch(() => undefined)
         .then(async () => {
-          await apiClient.save.updateSave({
+          const saveResponse = await apiClient.save.updateSave({
             docId: documentId,
             saveId,
             saveUpdateRequest: {
               content: blocks,
             },
           })
+
+          void syncDocumentThumbnail({
+            documentId,
+            blocks,
+            thumbnail: saveResponse.thumbnail,
+          })
+            .then(() => {
+              void queryClient.invalidateQueries({ queryKey: ["documents"] })
+            })
+            .catch((error) => {
+              console.warn("문서 썸네일 동기화에 실패했습니다.", error)
+            })
+
           queryClient.setQueryData(
             ["snapshotContent", documentId, "workspace", saveId],
             blocks,

@@ -43,7 +43,24 @@ export interface ImageUploadUrlRequest {
      * @memberof ImageUploadUrlRequest
      */
     size: number;
+    /**
+     * 이미지 업로드 목적(DOC_CONTENT/DOC_THUMBNAIL)
+     * @type {string}
+     * @memberof ImageUploadUrlRequest
+     */
+    purpose: ImageUploadUrlRequestPurposeEnum;
 }
+
+
+/**
+ * @export
+ */
+export const ImageUploadUrlRequestPurposeEnum = {
+    DocContent: 'DOC_CONTENT',
+    DocThumbnail: 'DOC_THUMBNAIL'
+} as const;
+export type ImageUploadUrlRequestPurposeEnum = typeof ImageUploadUrlRequestPurposeEnum[keyof typeof ImageUploadUrlRequestPurposeEnum];
+
 
 /**
  * Check if a given object implements the ImageUploadUrlRequest interface.
@@ -53,6 +70,7 @@ export function instanceOfImageUploadUrlRequest(value: object): value is ImageUp
     if (!('originalFileName' in value) || value['originalFileName'] === undefined) return false;
     if (!('contentType' in value) || value['contentType'] === undefined) return false;
     if (!('size' in value) || value['size'] === undefined) return false;
+    if (!('purpose' in value) || value['purpose'] === undefined) return false;
     return true;
 }
 
@@ -70,6 +88,7 @@ export function ImageUploadUrlRequestFromJSONTyped(json: any, ignoreDiscriminato
         'originalFileName': json['originalFileName'],
         'contentType': json['contentType'],
         'size': json['size'],
+        'purpose': json['purpose'],
     };
 }
 
@@ -88,6 +107,7 @@ export function ImageUploadUrlRequestToJSONTyped(value?: ImageUploadUrlRequest |
         'originalFileName': value['originalFileName'],
         'contentType': value['contentType'],
         'size': value['size'],
+        'purpose': value['purpose'],
     };
 }
 

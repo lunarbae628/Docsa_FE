@@ -18,9 +18,13 @@ export function useCreateDocument() {
         docTitleRequest: { title },
       })
     },
+    retry: false,
     onSuccess: (response) => {
-      // 성공 시 문서 목록 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["documents"] })
+      // 목록 화면에 다시 진입할 때 최신 projection을 가져오도록 stale 처리만 한다.
+      queryClient.invalidateQueries({
+        queryKey: ["documents"],
+        refetchType: "none",
+      })
 
       // 모달 닫기
       closeCreateModal()
@@ -63,8 +67,9 @@ export function useCreateDocument() {
   }
 
   const createNewDocument = async () => {
-    if (!newDocumentTitle.trim()) return
-    createDocumentMutation.mutate(newDocumentTitle.trim())
+    const title = newDocumentTitle.trim()
+    if (!title || createDocumentMutation.isPending) return
+    createDocumentMutation.mutate(title)
   }
 
   return {

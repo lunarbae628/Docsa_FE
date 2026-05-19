@@ -418,9 +418,18 @@ export function useDocumentWorkspaceBodyState({
       requestedDocumentMode === "save"
         ? `${documentId}:save:${requestedSaveId}`
         : `${documentId}:commit:${requestedCommitId}`
+    const isDirectContentLoaded =
+      requestedDocumentMode === "save"
+        ? workspacesRef.current.some(
+            (workspace) => workspace.id === requestedSaveId && workspace.loaded,
+          )
+        : commitsRef.current.some(
+            (commit) => commit.id === requestedCommitId && commit.loaded,
+          )
     if (
       appliedDirectContentRef.current?.key === directContentKey &&
-      appliedDirectContentRef.current.data === directSelectedData
+      appliedDirectContentRef.current.data === directSelectedData &&
+      isDirectContentLoaded
     ) {
       return
     }

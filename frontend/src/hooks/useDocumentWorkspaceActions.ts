@@ -1,8 +1,8 @@
+import type { ThumbnailSyncResponse } from "@/api/__generated__"
 import { apiClient } from "@/api/apiClient"
 import type { CommitNodeMenuType } from "@/components/CommitNode"
 import type { TempNodeMenuType } from "@/components/TempNode"
 import { useDialog } from "@/components/ui/alert-dialog"
-import type { ThumbnailSyncResponse } from "@/api/__generated__"
 import type {
   BranchRecord,
   CommitRecord,
@@ -911,28 +911,56 @@ export function useDocumentWorkspaceActions({
           throw new Error("병합 워크스페이스를 만들지 못했습니다.")
         }
 
+        const mergedSaveId = mergeResult.saveId
+        const mergedBranchId = mergeResult.branchId
         const mergedBlocks = (mergedData.blocks ?? []) as SnapshotBlock[]
 
         updateGraphData((current) =>
           updateGraphCacheAfterBranchCreate(current, {
-            id: mergeResult.branchId,
+            id: mergedBranchId,
             name: mergeBranchName,
             createdAt: new Date().toISOString(),
             fromCommitId: baseCommitId,
             mergeTargetCommitId: targetCommitId,
             rootCommitId: null,
             leafCommitId: null,
-            saveId: mergeResult.saveId ?? null,
+            saveId: mergedSaveId,
           }),
         )
         queryClient.setQueryData(
-          ["snapshotContent", documentId, "workspace", mergeResult.saveId],
+          ["snapshotContent", documentId, "workspace", mergedSaveId],
           mergedBlocks,
         )
+        setWorkspaces((prev) => {
+          const nextWorkspace: WorkspaceRecord = {
+            id: mergedSaveId,
+            branchId: mergedBranchId,
+            content: editorDataToMarkdown({
+              time: Date.now(),
+              version: "2.30.8",
+              blocks: mergedBlocks,
+            }),
+            blocks: mergedBlocks,
+            loaded: true,
+          }
+
+          if (prev.some((workspace) => workspace.id === nextWorkspace.id)) {
+            return prev.map((workspace) =>
+              workspace.id === nextWorkspace.id ? nextWorkspace : workspace,
+            )
+          }
+
+          return [...prev, nextWorkspace]
+        })
 
         const nextParams = new URLSearchParams({
           mode: "save",
-          saveId: String(mergeResult.saveId),
+          saveId: String(mergedSaveId),
+        })
+        setView({
+          mode: "workspace",
+          branchId: mergedBranchId,
+          workspaceId: mergedSaveId,
         })
         await refreshDocumentState(nextParams, false)
         setSearchParams(nextParams, { replace: true })
@@ -957,6 +985,8 @@ export function useDocumentWorkspaceActions({
       queryClient,
       refreshDocumentState,
       setSearchParams,
+      setView,
+      setWorkspaces,
       updateGraphData,
       view,
     ],
@@ -1045,7 +1075,7 @@ export function useDocumentWorkspaceActions({
           documentId,
           branchId,
           branchRenameRequest: {
-            name: newName,
+            newName,
           },
         })
         updateGraphData((current) =>

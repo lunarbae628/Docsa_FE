@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { apiClient } from "@/api/apiClient"
-import { useAuth } from "./useAuth"
 import type { DocListResponse } from "@/api/__generated__"
 import type { PageDocListResponse } from "@/api/__generated__/models/PageDocListResponse"
+import { apiClient } from "@/api/apiClient"
+import { useQuery } from "@tanstack/react-query"
+import { useMemo, useState } from "react"
+import { useAuth } from "./useAuth"
 
 const PAGE_SIZE = 12
 
@@ -12,6 +12,7 @@ type Order = "asc" | "desc"
 
 type DocListResponseWithThumbnail = DocListResponse & {
   thumbnailUrl?: string
+  recentSaveId?: number
   thumbnail?: {
     thumbnailUrl?: string
   }
@@ -29,6 +30,7 @@ function transformDocListResponse(apiDoc: DocListResponse) {
     preview: apiDoc.preview || "미리보기가 없습니다.",
     thumbnailUrl:
       docWithThumbnail.thumbnail?.thumbnailUrl ?? docWithThumbnail.thumbnailUrl,
+    recentSaveId: docWithThumbnail.recentSaveId,
     recent: apiDoc.recent
       ? {
           recentType: apiDoc.recent.recentType,

@@ -303,6 +303,18 @@ export default function DocumentWorkspacePage() {
         : view.mode === "merge"
           ? "브랜치 병합"
           : `${currentBranch?.name ?? "branch"} 기록`
+  const rightSubtitle =
+    view.mode === "commit" && currentCommit
+      ? currentCommit.title
+      : view.mode === "compare" && compareBaseItem
+        ? `${compareBaseItem.title} 기준 비교`
+        : view.mode === "merge" && mergeSourceItem
+          ? mergeTargetItem
+            ? `${mergeSourceItem.title} -> ${mergeTargetItem.title}`
+            : `${mergeSourceItem.title} 기준 병합`
+          : view.mode === "workspace"
+            ? (toast ?? "")
+            : ""
 
   const isCurrentWorkspaceContentReady =
     view.mode === "workspace" &&
@@ -468,33 +480,16 @@ export default function DocumentWorkspacePage() {
           </div>
 
           <div className="h-full min-h-0 bg-slate-100 p-3">
-            <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
                       {rightTitle}
                     </p>
-                    {view.mode === "commit" && currentCommit ? (
-                      <p className="truncate text-xs text-slate-500">
-                        {currentCommit.title}
-                      </p>
-                    ) : null}
-                    {view.mode === "compare" && compareBaseItem ? (
-                      <p className="truncate text-xs text-slate-500">
-                        {compareBaseItem.title} 기준 비교
-                      </p>
-                    ) : null}
-                    {view.mode === "merge" && mergeSourceItem ? (
-                      <p className="truncate text-xs text-slate-500">
-                        {mergeTargetItem
-                          ? `${mergeSourceItem.title} -> ${mergeTargetItem.title}`
-                          : `${mergeSourceItem.title} 기준 병합`}
-                      </p>
-                    ) : null}
-                    {view.mode === "workspace" && toast ? (
-                      <p className="truncate text-xs text-slate-500">{toast}</p>
-                    ) : null}
+                    <p className="min-h-4 truncate text-xs text-slate-500">
+                      {rightSubtitle}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -614,7 +609,7 @@ export default function DocumentWorkspacePage() {
               </div>
 
               <div
-                className={`flex-1 overflow-auto ${
+                className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] transition-colors duration-150 ${
                   view.mode === "compare"
                     ? "bg-slate-50 p-4"
                     : "bg-white px-5 py-4"

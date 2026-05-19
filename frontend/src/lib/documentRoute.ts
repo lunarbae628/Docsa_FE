@@ -1,5 +1,6 @@
 type DocumentRouteSource = {
   id?: number
+  recentSaveId?: number
   recent?: {
     recentType?: string
     recentTypeId?: number
@@ -14,6 +15,10 @@ export function getDocumentWorkspacePath(document: DocumentRouteSource) {
   }
 
   const { recentType, recentTypeId } = document.recent ?? {}
+
+  if (document.recentSaveId) {
+    return `/documents/${documentId}?mode=save&saveId=${document.recentSaveId}`
+  }
 
   if (recentType === "SAVE" && recentTypeId) {
     return `/documents/${documentId}?mode=save&saveId=${recentTypeId}`

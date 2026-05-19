@@ -87,7 +87,7 @@ export default function ResizableLayout({
           width: `${isSidebarCollapsed ? collapsedWidth : sidebarWidth}px`,
         }}
       >
-        <div className="h-full overflow-auto">
+        <div className="h-full min-h-0 overflow-hidden">
           {isSidebarCollapsed ? collapsedSidebar : sidebarContent}
         </div>
 

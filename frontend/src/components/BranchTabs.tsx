@@ -173,7 +173,7 @@ export default function BranchTabs({
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{
                       backgroundColor: currentBranch
-                        ? getBranchColor(currentBranch.name)
+                        ? getBranchColor(currentBranch.id)
                         : "#94a3b8",
                     }}
                   />
@@ -207,7 +207,7 @@ export default function BranchTabs({
                     >
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: getBranchColor(branch.name) }}
+                        style={{ backgroundColor: getBranchColor(branch.id) }}
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-slate-800">
@@ -228,6 +228,7 @@ export default function BranchTabs({
                           className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30"
                           disabled={!canRename}
                           onClick={(event) => {
+                            event.preventDefault()
                             event.stopPropagation()
                             setRenameTargetBranch(branch)
                             setRenameOpen(true)
@@ -241,6 +242,7 @@ export default function BranchTabs({
                           className="rounded-md p-1 text-red-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
                           disabled={!canDelete}
                           onClick={(event) => {
+                            event.preventDefault()
                             event.stopPropagation()
                             openDeleteDialog(branch)
                           }}

@@ -17,7 +17,7 @@ export const COLOR_PALETTE = [
   "#6366f1", // indigo
 ] as const
 
-// 브랜치 이름을 기반으로 해시 생성
+// 문자열을 기반으로 해시 생성
 export function stringToHash(str: string): number {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -29,15 +29,8 @@ export function stringToHash(str: string): number {
 }
 
 // 브랜치별 색상 생성 함수
-export function getBranchColor(branchName: string): string {
-  // main 브랜치는 indigo 색상 유지
-  if (branchName === "main") {
-    return "#6366f1"
-  }
-
-  // 브랜치 이름을 기반으로 색상 선택
-  const hash = stringToHash(branchName)
-  const colorIndex = hash % COLOR_PALETTE.length
+export function getBranchColor(branchId: number): string {
+  const colorIndex = Math.abs(branchId) % COLOR_PALETTE.length
   return COLOR_PALETTE[colorIndex]
 }
 

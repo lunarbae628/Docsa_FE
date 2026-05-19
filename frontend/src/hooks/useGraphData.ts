@@ -1,13 +1,13 @@
+import type { GraphResponse } from "@/api/__generated__"
+import type { BranchGraphDto } from "@/api/__generated__/models/BranchGraphDto"
+import type { CommitDto } from "@/api/__generated__/models/CommitDto"
+import type { EdgeDto } from "@/api/__generated__/models/EdgeDto"
+import { apiClient } from "@/api/apiClient"
+import { GRAPH_LAYOUT, getBranchColor } from "@/lib/graphUtils"
+import type { Commit, GraphDataType, GraphNode } from "@/types/graph"
+import { useQuery } from "@tanstack/react-query"
 import { useMemo } from "react"
 import { type Edge, Position } from "reactflow"
-import type { GraphDataType, Commit, GraphNode } from "@/types/graph"
-import { getBranchColor, GRAPH_LAYOUT } from "@/lib/graphUtils"
-import { useQuery } from "@tanstack/react-query"
-import { apiClient } from "@/api/apiClient"
-import type { GraphResponse } from "@/api/__generated__"
-import type { CommitDto } from "@/api/__generated__/models/CommitDto"
-import type { BranchGraphDto } from "@/api/__generated__/models/BranchGraphDto"
-import type { EdgeDto } from "@/api/__generated__/models/EdgeDto"
 
 interface UseGraphRenderProps {
   data: GraphDataType
@@ -126,7 +126,10 @@ export function useGraphRender({
   activeSaveId,
   isMainBranchLeafCommit,
 }: UseGraphRenderProps) {
-  const renderableCommitEdges = useMemo(() => buildRenderableCommitEdges(data), [data])
+  const renderableCommitEdges = useMemo(
+    () => buildRenderableCommitEdges(data),
+    [data],
+  )
 
   // 커밋을 React Flow 노드로 변환
   const { commitNodes, infoByBranch, commitDepths } = useMemo(() => {
@@ -173,7 +176,7 @@ export function useGraphRender({
     const nodes = data.commits.map((commit) => {
       const branch = data.branches.find((b) => b.id === commit.branchId)
       const branchName = branch?.name || "unknown"
-      const color = getBranchColor(branchName)
+      const color = getBranchColor(commit.branchId)
 
       // 브랜치별로 x 위치 조정
       const branchIndex = data.branches.findIndex(
@@ -184,7 +187,8 @@ export function useGraphRender({
 
       // 연결 순서(depth)에 따른 y 위치 조정
       const depth = commitDepths.get(commit.id) || 0
-      const yPosition = depth * GRAPH_LAYOUT.ROW_SPACING + GRAPH_LAYOUT.BASE_Y_OFFSET
+      const yPosition =
+        depth * GRAPH_LAYOUT.ROW_SPACING + GRAPH_LAYOUT.BASE_Y_OFFSET
 
       // 브랜치별 정보 업데이트
       if (!infoByBranch[commit.branchId]) {
@@ -241,11 +245,7 @@ export function useGraphRender({
       const sourceCommit = data.commits.find((c) => c.id === edge.from)
       const targetCommit = data.commits.find((c) => c.id === edge.to)
       const isSameBranch = sourceCommit?.branchId === targetCommit?.branchId
-      const edgeColor = getBranchColor(
-        targetCommit
-          ? (data.branches.find((b) => b.id === targetCommit.branchId)?.name ?? "branch")
-          : "branch",
-      )
+      const edgeColor = getBranchColor(targetCommit?.branchId ?? 0)
 
       return {
         id: `edge-${edge.from}-${edge.to}`,
@@ -271,7 +271,7 @@ export function useGraphRender({
     for (const branch of data.branches) {
       if (branch.saveId) {
         const branchName = branch.name
-        const color = getBranchColor(branchName)
+        const color = getBranchColor(branch.id)
 
         // infoByBranch에서 해당 브랜치의 가장 아래 위치 가져오기
         const branchInfo = infoByBranch[branch.id]

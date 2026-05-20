@@ -57,10 +57,18 @@ export default function CreateDocumentModal({
               onChange={(e) => setTitle(e.target.value)}
               className="h-12 text-base border-slate-200 focus:border-slate-800 focus:ring-slate-800"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !isCreating && title.trim()) {
+                if (
+                  e.key === "Enter" &&
+                  !e.nativeEvent.isComposing &&
+                  !e.repeat &&
+                  !isCreating &&
+                  title.trim()
+                ) {
+                  e.preventDefault()
                   onCreateDocument()
                 }
               }}
+              disabled={isCreating}
               autoFocus
             />
           </div>

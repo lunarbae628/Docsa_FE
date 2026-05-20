@@ -26,7 +26,13 @@ import { Label } from "@/components/ui/label"
 import { getBranchColor } from "@/lib/graphUtils"
 import type { Branch, Commit } from "@/types/graph"
 import { ChevronDown, GitBranch, PencilLine, Trash2 } from "lucide-react"
-import { type MouseEvent, useEffect, useMemo, useState } from "react"
+import {
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 
 interface BranchTabsProps {
   branches: Branch[]
@@ -36,6 +42,7 @@ interface BranchTabsProps {
   onBranchDelete?: (branchId: number) => void
   onBranchRename?: (branchId: number, newName: string) => void | Promise<void>
   onBranchCreate?: () => void
+  panelAction?: ReactNode
 }
 
 interface DeleteConfirmDialog {
@@ -52,6 +59,7 @@ export default function BranchTabs({
   onBranchSelect,
   onBranchDelete,
   onBranchRename,
+  panelAction,
 }: BranchTabsProps) {
   const [deleteDialog, setDeleteDialog] = useState<DeleteConfirmDialog>({
     isOpen: false,
@@ -158,22 +166,20 @@ export default function BranchTabs({
 
   return (
     <>
-      <div className="border-b border-slate-200/90 bg-white/80 px-4 py-3 backdrop-blur">
-        <div className="flex items-center gap-2">
-          <GitBranch className="h-4 w-4 text-slate-500" />
-          <span className="text-sm font-medium text-slate-700">브랜치</span>
-          <div className="ml-auto flex items-center gap-2">
+      <div className="border-b border-slate-200/90 bg-white/90 px-4 py-3 backdrop-blur">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex h-11 min-w-[220px] items-center gap-2 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fdfefe_0%,#f8fafc_100%)] px-3.5 text-sm text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.06)] transition hover:border-slate-300"
+                  className="flex h-10 w-full min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fdfefe_0%,#f8fafc_100%)] px-3.5 text-sm text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.06)] transition hover:border-slate-300"
                 >
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{
                       backgroundColor: currentBranch
-                        ? getBranchColor(currentBranch.name)
+                        ? getBranchColor(currentBranch.id)
                         : "#94a3b8",
                     }}
                   />
@@ -207,7 +213,7 @@ export default function BranchTabs({
                     >
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: getBranchColor(branch.name) }}
+                        style={{ backgroundColor: getBranchColor(branch.id) }}
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-slate-800">
@@ -228,6 +234,7 @@ export default function BranchTabs({
                           className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30"
                           disabled={!canRename}
                           onClick={(event) => {
+                            event.preventDefault()
                             event.stopPropagation()
                             setRenameTargetBranch(branch)
                             setRenameOpen(true)
@@ -241,6 +248,7 @@ export default function BranchTabs({
                           className="rounded-md p-1 text-red-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
                           disabled={!canDelete}
                           onClick={(event) => {
+                            event.preventDefault()
                             event.stopPropagation()
                             openDeleteDialog(branch)
                           }}
@@ -255,6 +263,7 @@ export default function BranchTabs({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {panelAction ? <div className="shrink-0">{panelAction}</div> : null}
         </div>
       </div>
 

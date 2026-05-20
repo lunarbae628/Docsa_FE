@@ -27,11 +27,13 @@ const SIDEBAR_DOCUMENT_PAGE_SIZE = 10
 type DocumentSidebarQuickMenuProps = {
   currentDocumentId: number
   triggerLabel?: string
+  align?: "start" | "center" | "end"
 }
 
 export default function DocumentSidebarQuickMenu({
   currentDocumentId,
   triggerLabel,
+  align = "start",
 }: DocumentSidebarQuickMenuProps) {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
@@ -76,7 +78,7 @@ export default function DocumentSidebarQuickMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        align="start"
+        align={align}
         sideOffset={10}
         className="w-[360px] overflow-hidden rounded-2xl border-slate-200 bg-white p-0 shadow-[0_24px_60px_rgba(15,23,42,0.18)]"
       >
@@ -108,7 +110,7 @@ export default function DocumentSidebarQuickMenu({
           </div>
         </div>
 
-        <div className="max-h-[420px] overflow-y-auto p-2">
+        <div className="scrollbar-none max-h-[420px] overflow-y-auto p-2">
           {sidebarQuery.isLoading ? (
             <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500">
               <Loader2 className="h-4 w-4 animate-spin" />

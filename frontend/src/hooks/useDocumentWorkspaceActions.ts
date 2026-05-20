@@ -1050,7 +1050,6 @@ export function useDocumentWorkspaceActions({
           const branch = branches.find((item) => item.saveId === targetId)
           if (!branch) return
           openWorkspaceByBranch(branch.id)
-          setToast("워크스페이스 열림")
         }
       }
     },

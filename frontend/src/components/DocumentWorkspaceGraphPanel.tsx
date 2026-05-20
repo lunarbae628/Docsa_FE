@@ -1,8 +1,8 @@
-import { memo } from "react"
-import DocumentGraph from "@/components/DocumentGraph"
-import type { Branch, GraphDataType } from "@/types/graph"
 import type { CommitNodeMenuType } from "@/components/CommitNode"
+import DocumentGraph from "@/components/DocumentGraph"
 import type { TempNodeMenuType } from "@/components/TempNode"
+import type { Branch, GraphDataType } from "@/types/graph"
+import { type ReactNode, memo } from "react"
 
 type CompareSelectionState = {
   active: boolean
@@ -36,6 +36,8 @@ interface DocumentWorkspaceGraphPanelProps {
   onBranchRename?: (branchId: number, newName: string) => void | Promise<void>
   onCompareTargetPick?: (kind: "commit" | "workspace", id: number) => void
   onMergeTargetPick?: (kind: "commit" | "workspace", id: number) => void
+  panelAction?: ReactNode
+  isOverlay?: boolean
 }
 
 function DocumentWorkspaceGraphPanelComponent({
@@ -54,6 +56,8 @@ function DocumentWorkspaceGraphPanelComponent({
   onBranchRename,
   onCompareTargetPick,
   onMergeTargetPick,
+  panelAction,
+  isOverlay = false,
 }: DocumentWorkspaceGraphPanelProps) {
   const hasGraph =
     graphData.branches.length > 0 ||
@@ -81,7 +85,11 @@ function DocumentWorkspaceGraphPanelComponent({
   }
 
   return (
-    <div className="h-full min-h-0 bg-slate-100 p-3">
+    <div
+      className={`h-full min-h-0 ${
+        isOverlay ? "bg-transparent" : "bg-slate-100 p-3"
+      }`}
+    >
       <DocumentGraph
         data={graphData}
         mainBranch={mainBranch}
@@ -96,6 +104,8 @@ function DocumentWorkspaceGraphPanelComponent({
         mergeSelection={mergeSelection}
         onCompareTargetPick={onCompareTargetPick}
         onMergeTargetPick={onMergeTargetPick}
+        panelAction={panelAction}
+        isOverlay={isOverlay}
       />
     </div>
   )

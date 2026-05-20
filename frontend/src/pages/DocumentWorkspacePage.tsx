@@ -2,6 +2,7 @@ import BranchEditModal from "@/components/BranchEditModal"
 import DocumentCompareView from "@/components/DocumentCompareView"
 import DocumentEditor from "@/components/DocumentEditor"
 import DocumentMergeView from "@/components/DocumentMergeView"
+import DocumentSidebarQuickMenu from "@/components/DocumentSidebarQuickMenu"
 import DocumentWorkspaceGraphPanel from "@/components/DocumentWorkspaceGraphPanel"
 import SaveCommitModal from "@/components/SaveCommitModal"
 import {
@@ -40,6 +41,8 @@ import {
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useParams, useSearchParams } from "react-router"
+
+const GRAPH_COLLAPSED_STORAGE_KEY = "docsa.graphCollapsed"
 
 function useDelayedFlag(value: boolean, delayMs = 180) {
   const [isDelayed, setIsDelayed] = useState(false)
@@ -133,10 +136,43 @@ function WorkspaceAutosaveStatus({
 export default function DocumentWorkspacePage() {
   const { id: documentIdParam } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [isGraphCollapsed, setIsGraphCollapsed] = useState(false)
   const queryDocumentId = Number(documentIdParam || 0)
   const isRealDocument = Number.isFinite(queryDocumentId) && queryDocumentId > 0
   const documentId = isRealDocument ? queryDocumentId : 0
+  const graphCollapsedStorageKey = `${GRAPH_COLLAPSED_STORAGE_KEY}:${documentId}`
+  const [isGraphCollapsed, setIsGraphCollapsedState] = useState(() => {
+    if (typeof window === "undefined") {
+      return false
+    }
+
+    return (
+      window.localStorage.getItem(
+        `${GRAPH_COLLAPSED_STORAGE_KEY}:${documentId}`,
+      ) === "true"
+    )
+  })
+  const setGraphCollapsed = (
+    nextValue: boolean | ((currentValue: boolean) => boolean),
+  ) => {
+    setIsGraphCollapsedState((currentValue) => {
+      const value =
+        typeof nextValue === "function" ? nextValue(currentValue) : nextValue
+      window.localStorage.setItem(
+        graphCollapsedStorageKey,
+        value ? "true" : "false",
+      )
+      return value
+    })
+  }
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    setIsGraphCollapsedState(
+      window.localStorage.getItem(graphCollapsedStorageKey) === "true",
+    )
+  }, [graphCollapsedStorageKey])
 
   const requestedMode = searchParams.get("mode")
   const requestedSaveId =
@@ -356,6 +392,25 @@ export default function DocumentWorkspacePage() {
       leafCommitId: null,
       saveId: null,
     } satisfies GraphDataType["branches"][number])
+  const graphPanelActions = (
+    <div className="flex items-center gap-1.5">
+      <DocumentSidebarQuickMenu currentDocumentId={documentId} align="end" />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="h-9 w-9 rounded-xl border-slate-200 bg-white/95 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+        aria-label={isGraphCollapsed ? "그래프 고정 열기" : "그래프 접기"}
+        onClick={() => setGraphCollapsed((prev) => !prev)}
+      >
+        {isGraphCollapsed ? (
+          <PanelLeftOpen className="h-4 w-4" />
+        ) : (
+          <PanelLeftClose className="h-4 w-4" />
+        )}
+      </Button>
+    </div>
+  )
 
   if (!isRealDocument) {
     return (
@@ -392,19 +447,11 @@ export default function DocumentWorkspacePage() {
           minWidth={340}
           maxWidth={860}
           isSidebarCollapsed={isGraphCollapsed}
-          collapsedWidth={58}
+          collapsedWidth={14}
+          revealCollapsedOnHover
           collapsedSidebar={
-            <div className="flex h-full min-h-0 items-start justify-center bg-slate-100 p-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-10 w-10 rounded-2xl border-slate-200 bg-white shadow-sm"
-                title="그래프 열기"
-                onClick={() => setIsGraphCollapsed(false)}
-              >
-                <PanelLeftOpen className="h-4 w-4" />
-              </Button>
+            <div className="group flex h-full min-h-0 items-start justify-center bg-slate-100 px-1 py-6">
+              <div className="h-16 w-1 rounded-full bg-slate-300/60 opacity-30 transition-all group-hover:bg-slate-400/80 group-hover:opacity-80" />
             </div>
           }
           className="h-full min-h-0"
@@ -412,17 +459,8 @@ export default function DocumentWorkspacePage() {
           mainClassName="h-full min-h-0 bg-slate-100"
         >
           <div className="relative h-full min-h-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="absolute right-6 top-6 z-30 h-9 w-9 rounded-2xl border-slate-200 bg-white/95 shadow-sm backdrop-blur"
-              title="그래프 접기"
-              onClick={() => setIsGraphCollapsed(true)}
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </Button>
             <DocumentWorkspaceGraphPanel
+              key={isGraphCollapsed ? "graph-collapsed" : "graph-expanded"}
               graphData={graphData}
               mainBranch={graphMainBranch}
               isInitialLoading={isInitialLoading}
@@ -476,20 +514,24 @@ export default function DocumentWorkspacePage() {
               }
               onCompareTargetPick={handleCompareTargetPick}
               onMergeTargetPick={handleMergeTargetPick}
+              panelAction={graphPanelActions}
+              isOverlay={isGraphCollapsed}
             />
           </div>
 
           <div className="h-full min-h-0 bg-slate-100 p-3">
             <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
+              <div className="flex min-h-[56px] items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">
+                    <p className="truncate text-base font-semibold tracking-[-0.01em] text-slate-900">
                       {rightTitle}
                     </p>
-                    <p className="min-h-4 truncate text-xs text-slate-500">
-                      {rightSubtitle}
-                    </p>
+                    {rightSubtitle ? (
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {rightSubtitle}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

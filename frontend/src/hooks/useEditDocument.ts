@@ -4,6 +4,7 @@ import { apiClient } from "@/api/apiClient"
 import { alertDialog } from "@/lib/utils"
 import { getApiErrorMessage } from "@/lib/apiError"
 import type { DocListResponse } from "@/api/__generated__/models/DocListResponse"
+import { updateDocumentTitleInCache } from "@/lib/documentQueryCache"
 
 interface UseEditDocumentProps {
   documents: DocListResponse[]
@@ -26,18 +27,12 @@ export function useEditDocument({ documents }: UseEditDocumentProps) {
       })
     },
     onSuccess: (response, variables) => {
-      // 성공 시 문서 목록 캐시 업데이트
-      queryClient.setQueryData(
-        ["documents"],
-        (oldData: DocListResponse[] | undefined) => {
-          if (!oldData) return oldData
-          return oldData.map((doc) =>
-            doc.id === variables.docId
-              ? { ...doc, title: variables.title }
-              : doc,
-          )
-        },
-      )
+      updateDocumentTitleInCache({
+        queryClient,
+        docId: variables.docId,
+        title: variables.title,
+        updatedAt: response.updatedAt,
+      })
 
       // 대화창 닫기
       setShowEditDialog(false)

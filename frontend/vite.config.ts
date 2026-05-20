@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react-swc"
 import tailwindcss from '@tailwindcss/vite'
 import path from "path"
 
+const backendApiTarget = process.env.VITE_BACKEND_API || "http://localhost:8080"
+const backendApiOrigin = new URL(backendApiTarget).origin
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -14,9 +17,9 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://api.docsa.o-r.kr",
+        target: backendApiOrigin,
         changeOrigin: true,
-        secure: true,
+        secure: backendApiOrigin.startsWith("https://"),
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log('🔄 Proxy request:', req.method, req.url, '-> ', proxyReq.path);
@@ -30,7 +33,7 @@ export default defineConfig({
             proxyReq.removeHeader('sec-ch-ua-platform');
             
             // Origin 헤더를 서버 주소로 변경
-            proxyReq.setHeader('origin', 'https://api.docsa.o-r.kr');
+            proxyReq.setHeader('origin', backendApiOrigin);
             proxyReq.removeHeader('referer');
           });
           proxy.on('proxyRes', (proxyRes, req, res) => {
@@ -43,7 +46,7 @@ export default defineConfig({
               proxyRes.headers['set-cookie'] = setCookieHeaders.map(cookie => {
                 // Domain을 localhost로 변경하고 중복 제거
                 return cookie
-                  .replace(/Domain=\.?docsa\.kro\.kr/gi, 'Domain=localhost')
+                  .replace(/Domain=\.?(docsa\.kro\.kr|docsa\.o-r\.kr)/gi, 'Domain=localhost')
                   .replace(/;\s*Domain=localhost;\s*Domain=localhost/gi, '; Domain=localhost') // 중복 제거
                   .replace(/;\s*Secure/gi, '') // 개발 환경에서는 Secure 제거
                   .replace(/;\s*SameSite=None/gi, '; SameSite=Lax'); // SameSite 변경

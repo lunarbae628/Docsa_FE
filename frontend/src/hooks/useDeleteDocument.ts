@@ -5,6 +5,7 @@ import { alertDialog } from "@/lib/utils"
 import { getApiErrorMessage } from "@/lib/apiError"
 import { apiClient } from "@/api/apiClient"
 import type { DocListResponse } from "@/api/__generated__"
+import { removeDocumentFromCache } from "@/lib/documentQueryCache"
 
 export function useDeleteDocument() {
   const { user } = useAuth()
@@ -23,9 +24,8 @@ export function useDeleteDocument() {
         docId,
       })
     },
-    onSuccess: () => {
-      // 성공 시 문서 목록 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["documents"] })
+    onSuccess: (_, docId) => {
+      removeDocumentFromCache({ queryClient, docId })
       console.log("문서 삭제 완료")
       // 다이얼로그 닫기
       setShowDeleteDialog(false)

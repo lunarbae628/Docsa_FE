@@ -115,7 +115,9 @@ function sanitizeBlockTunes(tunes: unknown) {
 function sanitizeEditorOutputData(data: OutputData): OutputData {
   return {
     ...data,
-    blocks: data.blocks.map((block) => sanitizeEditorBlock(block)),
+    blocks: compactRepeatedEmptyParagraphBlocks(
+      data.blocks.map((block) => sanitizeEditorBlock(block)),
+    ),
   }
 }
 
@@ -183,7 +185,107 @@ function sanitizeColumnsData(data: Record<string, unknown>) {
 
 function getDataSignature(data: OutputData | undefined) {
   if (!data) return ""
-  return JSON.stringify(data.blocks ?? [])
+  return getBlocksSignature(sanitizeEditorOutputData(data).blocks)
+}
+
+function getBlocksSignature(blocks: OutputData["blocks"]) {
+  return JSON.stringify(blocks ?? [])
+}
+
+function destroyEditor(editor: EditorJS) {
+  editor.isReady
+    .then(() => {
+      editor.destroy()
+    })
+    .catch((error) => {
+      console.error("Error destroying editor:", error)
+    })
+}
+
+function isEmptyParagraphBlock(block: OutputData["blocks"][number]) {
+  if (block.type !== "paragraph") {
+    return false
+  }
+
+  const text =
+    block.data && typeof block.data === "object"
+      ? String((block.data as { text?: unknown }).text ?? "")
+      : ""
+
+  return text.replace(/<br\s*\/?>/gi, "").trim() === ""
+}
+
+function compactRepeatedEmptyParagraphBlocks(blocks: OutputData["blocks"]) {
+  let emptyParagraphStreak = 0
+
+  return blocks.filter((block) => {
+    if (!isEmptyParagraphBlock(block)) {
+      emptyParagraphStreak = 0
+      return true
+    }
+
+    emptyParagraphStreak += 1
+    return emptyParagraphStreak <= 2
+  })
+}
+
+function getEditableParagraphTarget(target: EventTarget | null) {
+  const node = target instanceof Node ? target : null
+  const element =
+    node instanceof HTMLElement ? node : (node?.parentElement ?? null)
+
+  return element?.closest<HTMLElement>('.ce-paragraph[contenteditable="true"]')
+}
+
+function isCaretAtEndOfElement(element: HTMLElement) {
+  const selection = window.getSelection()
+
+  if (!selection || selection.rangeCount === 0) {
+    return true
+  }
+
+  const range = selection.getRangeAt(0)
+
+  if (!range.collapsed) {
+    return false
+  }
+
+  if (!element.contains(range.endContainer)) {
+    return document.activeElement === element
+  }
+
+  const afterCaretRange = range.cloneRange()
+  afterCaretRange.selectNodeContents(element)
+  afterCaretRange.setStart(range.endContainer, range.endOffset)
+
+  return afterCaretRange.toString() === ""
+}
+
+function refreshToolbarPosition(editor: EditorJS, blockIndex?: number) {
+  editor.toolbar.close()
+
+  const openToolbar = () => {
+    if (typeof blockIndex === "number") {
+      editor.caret.setToBlock(blockIndex, "start")
+    }
+
+    editor.toolbar.open()
+  }
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(openToolbar)
+  })
+}
+
+function openEditorToolbox(editor: EditorJS) {
+  window.requestAnimationFrame(() => {
+    editor.toolbar.open()
+    ;(
+      editor.toolbar as EditorJS["toolbar"] & {
+        toggleToolbox?: (openingState?: boolean) => void
+      }
+    ).toggleToolbox?.(true)
+  })
 }
 
 function isMarkdownShortcutCandidate(text: string) {
@@ -461,10 +563,122 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       if (!containerRef.current) {
         return
       }
+      const container = containerRef.current
+      const normalizeRenderedData = async () => {
+        const currentEditor = editorRef.current
+
+        if (!currentEditor || isApplyingShortcutRef.current) {
+          return
+        }
+
+        try {
+          await currentEditor.isReady
+          const rawOutputData = await currentEditor.save()
+          const outputData = sanitizeEditorOutputData(rawOutputData)
+
+          if (
+            getBlocksSignature(rawOutputData.blocks) ===
+            getBlocksSignature(outputData.blocks)
+          ) {
+            return
+          }
+
+          isApplyingShortcutRef.current = true
+          await currentEditor.render(outputData)
+          isApplyingShortcutRef.current = false
+          onDataChange?.(outputData)
+        } catch (error) {
+          isApplyingShortcutRef.current = false
+          console.error("Error normalizing editor data:", error)
+        }
+      }
+      const handleNativeKeyDown = (event: globalThis.KeyboardEvent) => {
+        if (
+          event.shiftKey ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.isComposing ||
+          (event.key !== "Enter" && event.key !== "/")
+        ) {
+          return
+        }
+
+        const paragraphTarget = getEditableParagraphTarget(event.target)
+
+        if (
+          !paragraphTarget ||
+          !container.contains(paragraphTarget) ||
+          (paragraphTarget.textContent?.trim() &&
+            !isCaretAtEndOfElement(paragraphTarget))
+        ) {
+          return
+        }
+
+        const currentEditor = editorRef.current
+
+        if (!currentEditor) {
+          return
+        }
+
+        if (event.key === "/") {
+          if (paragraphTarget.textContent?.trim()) {
+            return
+          }
+
+          event.stopPropagation()
+          event.stopImmediatePropagation()
+
+          void currentEditor.isReady
+            .then(() => {
+              if (editorRef.current === currentEditor) {
+                openEditorToolbox(currentEditor)
+              }
+            })
+            .catch((error) => {
+              console.error("Error handling editor slash key:", error)
+            })
+          return
+        }
+
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+
+        void currentEditor.isReady
+          .then(() => {
+            if (editorRef.current !== currentEditor) {
+              return
+            }
+
+            const currentBlockIndex =
+              currentEditor.blocks.getCurrentBlockIndex()
+            const insertIndex =
+              currentBlockIndex >= 0
+                ? currentBlockIndex + 1
+                : currentEditor.blocks.getBlocksCount()
+
+            currentEditor.blocks.insert(
+              "paragraph",
+              { text: "" },
+              undefined,
+              insertIndex,
+              true,
+            )
+            refreshToolbarPosition(currentEditor, insertIndex)
+
+            window.setTimeout(() => {
+              void normalizeRenderedData()
+            }, 0)
+          })
+          .catch((error) => {
+            console.error("Error handling editor enter key:", error)
+          })
+      }
 
       // 이미 에디터가 있으면 먼저 삭제
       if (editorRef.current) {
-        editorRef.current.destroy()
+        destroyEditor(editorRef.current)
         editorRef.current = null
         setIsReady(false)
       }
@@ -473,8 +687,11 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
       lastRenderedDataSignatureRef.current = getDataSignature(initialData)
       let observer: MutationObserver | null = null
       let headerStyleTimer: number | null = null
+      document.addEventListener("keydown", handleNativeKeyDown, {
+        capture: true,
+      })
       const editor = new EditorJS({
-        holder: containerRef.current,
+        holder: container,
         readOnly: !isEditable,
         data: initialData,
         placeholder: isEditable ? "내용을 입력하세요..." : "",
@@ -546,9 +763,6 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           paragraph: {
             class: Paragraph,
             inlineToolbar: true,
-            config: {
-              preserveBlank: true,
-            },
           },
         },
         onChange: async () => {
@@ -567,7 +781,25 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
                 return
               }
 
-              const outputData = sanitizeEditorOutputData(await editor.save())
+              const rawOutputData = await editor.save()
+              const outputData = sanitizeEditorOutputData(rawOutputData)
+
+              if (
+                getBlocksSignature(rawOutputData.blocks) !==
+                getBlocksSignature(outputData.blocks)
+              ) {
+                isApplyingShortcutRef.current = true
+
+                if (editorRef.current !== editor) {
+                  isApplyingShortcutRef.current = false
+                  return
+                }
+
+                await editor.render(outputData)
+                isApplyingShortcutRef.current = false
+                onDataChange(outputData)
+                return
+              }
 
               if (enableMarkdownShortcuts) {
                 const transformedData = applyMarkdownShortcuts(outputData)
@@ -669,17 +901,16 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
           window.clearTimeout(headerStyleTimer)
         }
         observer?.disconnect()
+        document.removeEventListener("keydown", handleNativeKeyDown, {
+          capture: true,
+        })
         setIsReady(false)
 
         if (editorRef.current === editor) {
           editorRef.current = null
         }
 
-        try {
-          editor.destroy()
-        } catch (error) {
-          console.error("Error destroying editor:", error)
-        }
+        destroyEditor(editor)
       }
     }, [
       isEditable,
@@ -707,7 +938,7 @@ const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
     // Handle mode changes
     useEffect(() => {
       if (editorRef.current && isReady) {
-        editorRef.current.readOnly.toggle(!isEditable)
+        editorRef.current.readOnly?.toggle(!isEditable)
       }
     }, [isEditable, isReady])
 

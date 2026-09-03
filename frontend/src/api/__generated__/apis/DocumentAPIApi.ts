@@ -36,6 +36,7 @@ export interface DeleteRequest {
 }
 
 export interface CreateRequest {
+    idempotencyKey: string;
     docTitleRequest: DocTitleRequest;
 }
 
@@ -118,6 +119,13 @@ export class DocumentAPIApi extends runtime.BaseAPI {
      * 문서 생성
      */
     async createRaw(requestParameters: CreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<DocCreateResponse>> {
+        if (requestParameters['idempotencyKey'] == null) {
+            throw new runtime.RequiredError(
+                'idempotencyKey',
+                'Required parameter "idempotencyKey" was null or undefined when calling create().'
+            );
+        }
+
         if (requestParameters['docTitleRequest'] == null) {
             throw new runtime.RequiredError(
                 'docTitleRequest',
@@ -130,6 +138,10 @@ export class DocumentAPIApi extends runtime.BaseAPI {
         const headerParameters: runtime.HTTPHeaders = {};
 
         headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters['idempotencyKey'] != null) {
+            headerParameters['Idempotency-Key'] = String(requestParameters['idempotencyKey']);
+        }
 
 
         let urlPath = `/api/document`;

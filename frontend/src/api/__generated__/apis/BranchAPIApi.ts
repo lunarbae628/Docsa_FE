@@ -35,6 +35,7 @@ import {
 
 export interface CreateBranchRequest {
   documentId: number
+  idempotencyKey: string
   branchCreateRequest: BranchCreateRequest
 }
 
@@ -68,6 +69,13 @@ export class BranchAPIApi extends runtime.BaseAPI {
       )
     }
 
+    if (requestParameters["idempotencyKey"] == null) {
+      throw new runtime.RequiredError(
+        "idempotencyKey",
+        'Required parameter "idempotencyKey" was null or undefined when calling createBranch().',
+      )
+    }
+
     if (requestParameters["branchCreateRequest"] == null) {
       throw new runtime.RequiredError(
         "branchCreateRequest",
@@ -80,6 +88,12 @@ export class BranchAPIApi extends runtime.BaseAPI {
     const headerParameters: runtime.HTTPHeaders = {}
 
     headerParameters["Content-Type"] = "application/json"
+
+    if (requestParameters["idempotencyKey"] != null) {
+      headerParameters["Idempotency-Key"] = String(
+        requestParameters["idempotencyKey"],
+      )
+    }
 
     let urlPath = `/api/document/{documentId}/branch`
     urlPath = urlPath.replace(

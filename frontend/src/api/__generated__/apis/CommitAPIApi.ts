@@ -32,6 +32,7 @@ import {
 
 export interface CreateCommitOperationRequest {
   docId: number
+  idempotencyKey: string
   createCommitRequest: CreateCommitRequest
 }
 
@@ -64,6 +65,13 @@ export class CommitAPIApi extends runtime.BaseAPI {
       )
     }
 
+    if (requestParameters["idempotencyKey"] == null) {
+      throw new runtime.RequiredError(
+        "idempotencyKey",
+        'Required parameter "idempotencyKey" was null or undefined when calling createCommit().',
+      )
+    }
+
     if (requestParameters["createCommitRequest"] == null) {
       throw new runtime.RequiredError(
         "createCommitRequest",
@@ -76,6 +84,12 @@ export class CommitAPIApi extends runtime.BaseAPI {
     const headerParameters: runtime.HTTPHeaders = {}
 
     headerParameters["Content-Type"] = "application/json"
+
+    if (requestParameters["idempotencyKey"] != null) {
+      headerParameters["Idempotency-Key"] = String(
+        requestParameters["idempotencyKey"],
+      )
+    }
 
     let urlPath = `/api/document/{docId}/commit`
     urlPath = urlPath.replace(

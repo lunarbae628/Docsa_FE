@@ -30,6 +30,7 @@ import {
 
 export interface MergeOperationRequest {
     docId: number;
+    idempotencyKey: string;
     mergeRequest: MergeRequest;
 }
 
@@ -50,6 +51,13 @@ export class MergeAPIApi extends runtime.BaseAPI {
             );
         }
 
+        if (requestParameters['idempotencyKey'] == null) {
+            throw new runtime.RequiredError(
+                'idempotencyKey',
+                'Required parameter "idempotencyKey" was null or undefined when calling merge().'
+            );
+        }
+
         if (requestParameters['mergeRequest'] == null) {
             throw new runtime.RequiredError(
                 'mergeRequest',
@@ -62,6 +70,10 @@ export class MergeAPIApi extends runtime.BaseAPI {
         const headerParameters: runtime.HTTPHeaders = {};
 
         headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters['idempotencyKey'] != null) {
+            headerParameters['Idempotency-Key'] = String(requestParameters['idempotencyKey']);
+        }
 
 
         let urlPath = `/api/document/{docId}/merge`;

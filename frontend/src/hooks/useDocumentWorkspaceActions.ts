@@ -657,6 +657,7 @@ export function useDocumentWorkspaceActions({
           saveId: String(result.saveId),
         })
         await refreshDocumentState(nextParams, false)
+        void queryClient.invalidateQueries({ queryKey: ["documents"] })
         setSearchParams(nextParams, { replace: true })
         setToast("새 브랜치 열림")
         idempotencyKeys.clear("branch")
@@ -681,6 +682,7 @@ export function useDocumentWorkspaceActions({
       documentId,
       idempotencyKeys,
       isRealDocument,
+      queryClient,
       refreshDocumentState,
       setSearchParams,
       updateGraphData,
@@ -1001,6 +1003,7 @@ export function useDocumentWorkspaceActions({
           workspaceId: mergedSaveId,
         })
         await refreshDocumentState(nextParams, false)
+        void queryClient.invalidateQueries({ queryKey: ["documents"] })
         setSearchParams(nextParams, { replace: true })
         setToast("병합 브랜치 생성됨")
         setMergeBranchState(null)

@@ -51,7 +51,8 @@ export default function DocumentSidebarQuickMenu({
       return response as PageDocListSimpleResponse
     },
     enabled: isOpen,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   })
 
   const documents = sidebarQuery.data?.content ?? []

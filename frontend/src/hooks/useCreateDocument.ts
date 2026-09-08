@@ -4,18 +4,26 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/api/apiClient"
 import { alertDialog } from "@/lib/utils"
 import { getApiErrorMessage } from "@/lib/apiError"
+import {
+  getCreateOperationErrorCode,
+  IdempotencyKeyStore,
+  shouldClearIdempotencyKey,
+} from "@/lib/idempotency"
 
 export function useCreateDocument() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [newDocumentTitle, setNewDocumentTitle] = useState("")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [idempotencyKeys] = useState(() => new IdempotencyKeyStore())
 
   // React Query Mutation을 사용한 문서 생성
   const createDocumentMutation = useMutation({
     mutationFn: async (title: string) => {
+      const request = { docTitleRequest: { title } }
       return await apiClient.document.create({
-        docTitleRequest: { title },
+        ...request,
+        idempotencyKey: idempotencyKeys.acquire("document", request),
       })
     },
     retry: false,
@@ -43,6 +51,12 @@ export function useCreateDocument() {
     onError: async (error: any) => {
       console.error("문서 생성 실패:", error)
 
+      if (
+        shouldClearIdempotencyKey(await getCreateOperationErrorCode(error))
+      ) {
+        idempotencyKeys.clear("document")
+      }
+
       // 서버에서 내려온 에러 메시지 추출
       const errorMessage = await getApiErrorMessage(
         error,
@@ -62,6 +76,7 @@ export function useCreateDocument() {
   }
 
   const closeCreateModal = () => {
+    idempotencyKeys.clear("document")
     setIsCreateModalOpen(false)
     setNewDocumentTitle("")
   }

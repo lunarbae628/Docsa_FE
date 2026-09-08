@@ -1,12 +1,14 @@
 import { apiClient } from "@/api/apiClient"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/useAuth"
+import { useQueryClient } from "@tanstack/react-query"
 import { Link, useLocation, useNavigate } from "react-router"
 import Logo from "../components/Logo"
 
 export default function Header() {
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const { isAuthenticated, user, logout } = useAuth()
 
   const isDocumentSurface =
@@ -22,6 +24,11 @@ export default function Header() {
 
   const handleLogin = () => {
     navigate("/login")
+  }
+
+  const handleLogoClick = () => {
+    if (!isAuthenticated) return
+    void queryClient.invalidateQueries({ queryKey: ["documents"] })
   }
 
   const handleLogout = () => {
@@ -46,6 +53,7 @@ export default function Header() {
         >
           <Link
             to={isAuthenticated ? "/documents" : "/"}
+            onClick={handleLogoClick}
             className="hover:opacity-80 transition-opacity"
           >
             <div className={isDocumentSurface ? "w-[136px]" : "w-[184px]"}>

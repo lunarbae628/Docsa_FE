@@ -87,6 +87,7 @@ export function useDocuments() {
       }
     },
     enabled: isAuthenticated,
+    refetchOnMount: "always",
   })
 
   // 문서 목록

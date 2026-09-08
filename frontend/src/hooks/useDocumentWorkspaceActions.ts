@@ -14,6 +14,11 @@ import type {
 import { getApiErrorMessage } from "@/lib/apiError"
 import { generateDocumentThumbnailArtifact } from "@/lib/documentThumbnails"
 import { editorDataToMarkdown } from "@/lib/editorMarkdown"
+import {
+  getCreateOperationErrorCode,
+  IdempotencyKeyStore,
+  shouldClearIdempotencyKey,
+} from "@/lib/idempotency"
 import { alertDialog } from "@/lib/utils"
 import type { GraphDataType } from "@/types/graph"
 import type { OutputData } from "@editorjs/editorjs"
@@ -372,6 +377,7 @@ export function useDocumentWorkspaceActions({
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null)
   const [isCommitModalOpen, setIsCommitModalOpen] = useState(false)
   const [isActionPending, setIsActionPending] = useState(false)
+  const [idempotencyKeys] = useState(() => new IdempotencyKeyStore())
   const syncTimerRef = useRef<number | null>(null)
   const pendingSaveRef = useRef<PendingWorkspaceSave | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
@@ -496,17 +502,23 @@ export function useDocumentWorkspaceActions({
         await persistWorkspaceBlocks(currentWorkspace.id, currentBlocks)
         setSyncStatus("synced")
 
+        const createCommitRequest = {
+          title,
+          description,
+          blocks: currentBlocks,
+          blockOrders: currentBlocks.map(
+            (block, index) => block.id ?? String(index),
+          ),
+          branchId: currentBranch.id,
+        }
+        const operationPayload = { documentId, createCommitRequest }
         const result = await apiClient.commit.createCommit({
           docId: documentId,
-          createCommitRequest: {
-            title,
-            description,
-            blocks: currentBlocks,
-            blockOrders: currentBlocks.map(
-              (block, index) => block.id ?? String(index),
-            ),
-            branchId: currentBranch.id,
-          },
+          idempotencyKey: idempotencyKeys.acquire(
+            "commit",
+            operationPayload,
+          ),
+          createCommitRequest,
         })
 
         if (!result.id) {
@@ -547,7 +559,13 @@ export function useDocumentWorkspaceActions({
         )
         setSearchParams(nextParams, { replace: true })
         setToast("기록 생성됨")
+        idempotencyKeys.clear("commit")
       } catch (error: any) {
+        if (
+          shouldClearIdempotencyKey(await getCreateOperationErrorCode(error))
+        ) {
+          idempotencyKeys.clear("commit")
+        }
         await alertDialog(
           await getApiErrorMessage(error, "기록 생성에 실패했습니다."),
           "오류",
@@ -561,6 +579,7 @@ export function useDocumentWorkspaceActions({
       currentBranch,
       currentWorkspace,
       documentId,
+      idempotencyKeys,
       isRealDocument,
       persistWorkspaceBlocks,
       refreshDocumentState,
@@ -598,12 +617,18 @@ export function useDocumentWorkspaceActions({
 
       setIsActionPending(true)
       try {
+        const branchCreateRequest = {
+          name: branchName,
+          fromCommitId: targetCommit.id,
+        }
+        const operationPayload = { documentId, branchCreateRequest }
         const result = await apiClient.branch.createBranch({
           documentId,
-          branchCreateRequest: {
-            name: branchName,
-            fromCommitId: targetCommit.id,
-          },
+          idempotencyKey: idempotencyKeys.acquire(
+            "branch",
+            operationPayload,
+          ),
+          branchCreateRequest,
         })
 
         setBranchEditState(null)
@@ -632,9 +657,16 @@ export function useDocumentWorkspaceActions({
           saveId: String(result.saveId),
         })
         await refreshDocumentState(nextParams, false)
+        void queryClient.invalidateQueries({ queryKey: ["documents"] })
         setSearchParams(nextParams, { replace: true })
         setToast("새 브랜치 열림")
+        idempotencyKeys.clear("branch")
       } catch (error: any) {
+        if (
+          shouldClearIdempotencyKey(await getCreateOperationErrorCode(error))
+        ) {
+          idempotencyKeys.clear("branch")
+        }
         await alertDialog(
           await getApiErrorMessage(error, "브랜치 생성에 실패했습니다."),
           "오류",
@@ -648,7 +680,9 @@ export function useDocumentWorkspaceActions({
       branchEditState,
       commits,
       documentId,
+      idempotencyKeys,
       isRealDocument,
+      queryClient,
       refreshDocumentState,
       setSearchParams,
       updateGraphData,
@@ -897,14 +931,20 @@ export function useDocumentWorkspaceActions({
 
       setIsActionPending(true)
       try {
+        const mergeRequest = {
+          branchName: mergeBranchName,
+          baseCommitId,
+          targetCommitId,
+          content: (mergedData.blocks ?? []) as SnapshotBlock[],
+        }
+        const operationPayload = { documentId, mergeRequest }
         const mergeResult = await apiClient.merge.merge({
           docId: documentId,
-          mergeRequest: {
-            branchName: mergeBranchName,
-            baseCommitId,
-            targetCommitId,
-            content: (mergedData.blocks ?? []) as SnapshotBlock[],
-          },
+          idempotencyKey: idempotencyKeys.acquire(
+            "merge",
+            operationPayload,
+          ),
+          mergeRequest,
         })
 
         if (!mergeResult.saveId || !mergeResult.branchId) {
@@ -963,10 +1003,17 @@ export function useDocumentWorkspaceActions({
           workspaceId: mergedSaveId,
         })
         await refreshDocumentState(nextParams, false)
+        void queryClient.invalidateQueries({ queryKey: ["documents"] })
         setSearchParams(nextParams, { replace: true })
         setToast("병합 브랜치 생성됨")
         setMergeBranchState(null)
+        idempotencyKeys.clear("merge")
       } catch (error: any) {
+        if (
+          shouldClearIdempotencyKey(await getCreateOperationErrorCode(error))
+        ) {
+          idempotencyKeys.clear("merge")
+        }
         await alertDialog(
           await getApiErrorMessage(error, "병합 적용에 실패했습니다."),
           "오류",
@@ -979,6 +1026,7 @@ export function useDocumentWorkspaceActions({
     [
       branches,
       documentId,
+      idempotencyKeys,
       isRealDocument,
       mergeSourceItem,
       mergeTargetItem,
